@@ -32,6 +32,10 @@ public class MessageEncoder extends MessageToByteEncoder<Message>
                     out.writeByte(MessageType.Drop.getId());
                     out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
                     break;
+                case OpenUDP:
+                    out.writeByte(MessageType.OpenUDP.getId());
+                    out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
+                    break;
                 default:
                     throw new IllegalArgumentException("UnknownMessageType");
             }

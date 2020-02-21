@@ -4,7 +4,7 @@
 
   <groupId>me.lain</groupId>
   <artifactId>MuxTunnelServer</artifactId>
-  <version>v1</version>
+  <version>v2</version>
   <packaging>jar</packaging>
 
   <name>MuxTunnelServer</name>

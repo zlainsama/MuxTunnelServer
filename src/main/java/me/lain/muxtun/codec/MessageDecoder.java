@@ -36,6 +36,11 @@ public class MessageDecoder extends ByteToMessageDecoder
                         .setType(MessageType.Drop)
                         .setStreamId(new UUID(in.readLong(), in.readLong())));
                 break;
+            case OpenUDP:
+                out.add(new Message()
+                        .setType(MessageType.OpenUDP)
+                        .setStreamId(new UUID(in.readLong(), in.readLong())));
+                break;
             default:
                 throw new CorruptedFrameException("UnknownMessageType");
         }

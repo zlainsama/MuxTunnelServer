@@ -8,15 +8,21 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.flush.FlushConsolidationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.AttributeKey;
@@ -169,9 +175,9 @@ public class MirrorPoint
                                                         @Override
                                                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception
                                                         {
-                                                            final Channel subChannel = ctx.channel();
+                                                            final Channel channel = ctx.channel();
 
-                                                            subChannel.close();
+                                                            channel.close();
                                                         }
 
                                                     });
@@ -186,7 +192,8 @@ public class MirrorPoint
                                         else
                                             channel.writeAndFlush(new Message()
                                                     .setType(MessageType.Drop)
-                                                    .setStreamId(requestId));
+                                                    .setStreamId(requestId))
+                                                    .addListener(ChannelFutureListener.CLOSE);
                                         break;
                                     }
                                     case Data:
@@ -210,6 +217,107 @@ public class MirrorPoint
                                         final Channel toClose = channel.attr(ONGOINGSTREAMS_KEY).get().remove(streamId);
                                         if (toClose != null && toClose.isActive())
                                             toClose.close();
+                                        break;
+                                    }
+                                    case OpenUDP:
+                                    {
+                                        final UUID requestId = msg.getStreamId();
+
+                                        final SocketAddress toOpen = targetAddresses.get(requestId);
+                                        if (toOpen != null)
+                                            new Bootstrap().group(Shared.workerGroup).channel(Shared.classDatagramChannel).handler(new ChannelInitializer<DatagramChannel>()
+                                            {
+
+                                                @Override
+                                                protected void initChannel(DatagramChannel ch) throws Exception
+                                                {
+                                                    ch.pipeline().addLast(new FlushConsolidationHandler());
+                                                    ch.pipeline().addLast(new IdleStateHandler(0, 0, 60));
+                                                    ch.pipeline().addLast(new SimpleChannelInboundHandler<DatagramPacket>()
+                                                    {
+
+                                                        @Override
+                                                        public void channelActive(ChannelHandlerContext ctx) throws Exception
+                                                        {
+                                                            final Channel boundChannel = channel;
+                                                            final Channel channel = ctx.channel();
+                                                            final UUID streamId = UUID.randomUUID();
+
+                                                            channel.attr(STREAMID_KEY).set(streamId);
+                                                            channel.attr(BOUNDCHANNEL_KEY).set(boundChannel);
+                                                            boundChannel.attr(ONGOINGSTREAMS_KEY).get().put(streamId, channel);
+                                                            allChannels.add(channel);
+
+                                                            if (boundChannel.isActive() && boundChannel.attr(ONGOINGSTREAMS_KEY).get().get(streamId) == channel)
+                                                                boundChannel.writeAndFlush(new Message()
+                                                                        .setType(MessageType.OpenUDP)
+                                                                        .setStreamId(streamId));
+                                                            else
+                                                                channel.close();
+                                                        }
+
+                                                        @Override
+                                                        public void channelInactive(ChannelHandlerContext ctx) throws Exception
+                                                        {
+                                                            final Channel channel = ctx.channel();
+                                                            final UUID streamId = channel.attr(STREAMID_KEY).get();
+                                                            final Channel boundChannel = channel.attr(BOUNDCHANNEL_KEY).get();
+
+                                                            if (boundChannel.isActive() && boundChannel.attr(ONGOINGSTREAMS_KEY).get().remove(streamId) == channel)
+                                                                boundChannel.writeAndFlush(new Message()
+                                                                        .setType(MessageType.Drop)
+                                                                        .setStreamId(streamId));
+                                                        }
+
+                                                        @Override
+                                                        protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket msg) throws Exception
+                                                        {
+                                                            final Channel channel = ctx.channel();
+                                                            final UUID streamId = channel.attr(STREAMID_KEY).get();
+                                                            final Channel boundChannel = channel.attr(BOUNDCHANNEL_KEY).get();
+
+                                                            if (boundChannel.isActive() && boundChannel.attr(ONGOINGSTREAMS_KEY).get().get(streamId) == channel)
+                                                                boundChannel.writeAndFlush(new Message()
+                                                                        .setType(MessageType.Data)
+                                                                        .setStreamId(streamId)
+                                                                        .setPayload(msg.content().retainedDuplicate()));
+                                                            else
+                                                                channel.close();
+                                                        }
+
+                                                        @Override
+                                                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception
+                                                        {
+                                                            final Channel channel = ctx.channel();
+
+                                                            channel.close();
+                                                        }
+
+                                                        @Override
+                                                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception
+                                                        {
+                                                            if (evt instanceof IdleStateEvent && ((IdleStateEvent) evt).state() == IdleState.ALL_IDLE)
+                                                            {
+                                                                final Channel channel = ctx.channel();
+
+                                                                channel.close();
+                                                            }
+                                                        }
+
+                                                    });
+                                                }
+
+                                            }).connect(toOpen).addListener(future -> {
+                                                if (!future.isSuccess())
+                                                    channel.writeAndFlush(new Message()
+                                                            .setType(MessageType.Drop)
+                                                            .setStreamId(requestId));
+                                            });
+                                        else
+                                            channel.writeAndFlush(new Message()
+                                                    .setType(MessageType.Drop)
+                                                    .setStreamId(requestId))
+                                                    .addListener(ChannelFutureListener.CLOSE);
                                         break;
                                     }
                                     default:
