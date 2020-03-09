@@ -1,48 +1,80 @@
 package me.lain.muxtun.codec;
 
-import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.MessageToByteEncoder;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
 import io.netty.util.ReferenceCountUtil;
 import me.lain.muxtun.codec.Message.MessageType;
 
-public class MessageEncoder extends MessageToByteEncoder<Message>
+@ChannelHandler.Sharable
+public class MessageEncoder extends ChannelOutboundHandlerAdapter
 {
 
-    @Override
-    protected void encode(ChannelHandlerContext ctx, Message msg, ByteBuf out) throws Exception
+    public static final MessageEncoder DEFAULT = new MessageEncoder();
+
+    protected Object encode(ChannelHandlerContext ctx, Message msg)
     {
-        try
+        switch (msg.getType())
         {
-            switch (msg.getType())
+            case Ping:
+                return ctx.alloc().buffer(1)
+                        .writeByte(MessageType.Ping.getId());
+            case Open:
+                return ctx.alloc().buffer(17)
+                        .writeByte(MessageType.Open.getId())
+                        .writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
+            case Data:
+                return ctx.alloc().buffer(17 + msg.getPayload().readableBytes())
+                        .writeByte(MessageType.Data.getId())
+                        .writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits())
+                        .writeBytes(msg.getPayload());
+            case Drop:
+                return ctx.alloc().buffer(17)
+                        .writeByte(MessageType.Drop.getId())
+                        .writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
+            case OpenUDP:
+                return ctx.alloc().buffer(17)
+                        .writeByte(MessageType.OpenUDP.getId())
+                        .writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
+            case Auth:
+                return ctx.alloc().buffer(1 + msg.getPayload().readableBytes())
+                        .writeByte(MessageType.Auth.getId())
+                        .writeBytes(msg.getPayload());
+            case AuthReq:
+                return ctx.alloc().buffer(1 + msg.getPayload().readableBytes())
+                        .writeByte(MessageType.AuthReq.getId())
+                        .writeBytes(msg.getPayload());
+            case AuthReq_3:
+                return ctx.alloc().buffer(1 + msg.getPayload().readableBytes())
+                        .writeByte(MessageType.AuthReq_3.getId())
+                        .writeBytes(msg.getPayload());
+            default:
+                throw new IllegalArgumentException("UnknownMessageType");
+        }
+    }
+
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception
+    {
+        if (msg instanceof Message)
+        {
+            Message cast = (Message) msg;
+
+            try
             {
-                case Ping:
-                    out.writeByte(MessageType.Ping.getId());
-                    break;
-                case Open:
-                    out.writeByte(MessageType.Open.getId());
-                    out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
-                    break;
-                case Data:
-                    out.writeByte(MessageType.Data.getId());
-                    out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
-                    out.writeBytes(msg.getPayload());
-                    break;
-                case Drop:
-                    out.writeByte(MessageType.Drop.getId());
-                    out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
-                    break;
-                case OpenUDP:
-                    out.writeByte(MessageType.OpenUDP.getId());
-                    out.writeLong(msg.getStreamId().getMostSignificantBits()).writeLong(msg.getStreamId().getLeastSignificantBits());
-                    break;
-                default:
-                    throw new IllegalArgumentException("UnknownMessageType");
+                Object result = encode(ctx, cast);
+                if (result != null)
+                    ctx.write(result, promise);
+            }
+            finally
+            {
+                ReferenceCountUtil.release(cast.getPayload());
             }
         }
-        finally
+        else
         {
-            ReferenceCountUtil.release(msg.getPayload());
+            ctx.write(msg, promise);
         }
     }
 

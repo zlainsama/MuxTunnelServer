@@ -16,6 +16,9 @@ public final class Message
         Data((byte) 0x33),
         Drop((byte) 0x34),
         OpenUDP((byte) 0x35),
+        Auth((byte) 0x71),
+        AuthReq((byte) 0x72),
+        AuthReq_3((byte) 0x73),
         Unknown((byte) 0xFF);
 
         private static final Map<Byte, MessageType> idMap = new HashMap<>();
