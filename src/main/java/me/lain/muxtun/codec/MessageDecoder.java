@@ -28,6 +28,8 @@ public class MessageDecoder extends ChannelInboundHandlerAdapter
                 Object result = decode(ctx, cast);
                 if (result != null)
                     ctx.fireChannelRead(result);
+                else
+                    throw new Error("BadDecoder");
             }
             finally
             {

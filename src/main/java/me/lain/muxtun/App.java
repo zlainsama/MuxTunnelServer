@@ -1,15 +1,11 @@
 package me.lain.muxtun;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +22,10 @@ import java.util.UUID;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.util.concurrent.Future;
+import me.lain.muxtun.mipo.MirrorPoint;
+import me.lain.muxtun.mipo.MirrorPointConfig;
+import me.lain.muxtun.util.SimpleLogger;
 
 public class App
 {
@@ -39,8 +39,8 @@ public class App
     private static Path pathSecret = null;
     private static Path pathSecret_3 = null;
     private static SslContext sslCtx = null;
-    private static Optional<byte[]> secret = null;
-    private static Optional<byte[]> secret_3 = null;
+    private static byte[] secret = null;
+    private static byte[] secret_3 = null;
     private static MirrorPoint theServer = null;
 
     private static void discardOut()
@@ -49,7 +49,7 @@ public class App
         System.setErr(new PrintStream(Shared.voidStream));
     }
 
-    private static Optional<byte[]> generateSecret(Path path, byte[] magic)
+    private static byte[] generateSecret(Path path, byte[] magic)
     {
         try (FileChannel fc = FileChannel.open(path, StandardOpenOption.READ))
         {
@@ -57,15 +57,15 @@ public class App
 
             fc.transferTo(0L, Long.MAX_VALUE, Channels.newChannel(new DigestOutputStream(Shared.voidStream, md)));
 
-            return Optional.of(md.digest(magic));
+            return md.digest(magic);
         }
         catch (Exception e)
         {
-            return Optional.empty();
+            return null;
         }
     }
 
-    private static Optional<byte[]> generateSecret_3(Path path, byte[] magic)
+    private static byte[] generateSecret_3(Path path, byte[] magic)
     {
         try (FileChannel fc = FileChannel.open(path, StandardOpenOption.READ))
         {
@@ -73,11 +73,11 @@ public class App
 
             fc.transferTo(0L, Long.MAX_VALUE, Channels.newChannel(new DigestOutputStream(Shared.voidStream, md)));
 
-            return Optional.of(md.digest(magic));
+            return md.digest(magic);
         }
         catch (Exception e)
         {
-            return Optional.empty();
+            return null;
         }
     }
 
@@ -115,98 +115,9 @@ public class App
         if (silent)
             discardOut();
         if (!nolog)
-            logOut(pathLog.orElse(FileSystems.getDefault().getPath("MuxTunnel.log")));
+            SimpleLogger.setFileOut(pathLog.orElse(FileSystems.getDefault().getPath("MuxTunnel.log")));
 
         return pathConfig.orElse(FileSystems.getDefault().getPath("MuxTunnel.cfg"));
-    }
-
-    private static void logOut(Path pathLog) throws IOException
-    {
-        final OutputStream fileOut = new BufferedOutputStream(Channels.newOutputStream(FileChannel.open(pathLog, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)));
-
-        System.setOut(new PrintStream(new OutputStream()
-        {
-
-            final OutputStream original = System.out;
-
-            @Override
-            public void close() throws IOException
-            {
-                original.close();
-                fileOut.close();
-            }
-
-            @Override
-            public void flush() throws IOException
-            {
-                original.flush();
-                fileOut.flush();
-            }
-
-            @Override
-            public void write(byte b[]) throws IOException
-            {
-                original.write(b);
-                fileOut.write(b);
-            }
-
-            @Override
-            public void write(byte b[], int off, int len) throws IOException
-            {
-                original.write(b, off, len);
-                fileOut.write(b, off, len);
-            }
-
-            @Override
-            public void write(int b) throws IOException
-            {
-                original.write(b);
-                fileOut.write(b);
-            }
-
-        }, true, StandardCharsets.UTF_8.name()));
-
-        System.setErr(new PrintStream(new OutputStream()
-        {
-
-            final OutputStream original = System.err;
-
-            @Override
-            public void close() throws IOException
-            {
-                original.close();
-                fileOut.close();
-            }
-
-            @Override
-            public void flush() throws IOException
-            {
-                original.flush();
-                fileOut.flush();
-            }
-
-            @Override
-            public void write(byte b[]) throws IOException
-            {
-                original.write(b);
-                fileOut.write(b);
-            }
-
-            @Override
-            public void write(byte b[], int off, int len) throws IOException
-            {
-                original.write(b, off, len);
-                fileOut.write(b, off, len);
-            }
-
-            @Override
-            public void write(int b) throws IOException
-            {
-                original.write(b);
-                fileOut.write(b);
-            }
-
-        }, true, StandardCharsets.UTF_8.name()));
     }
 
     public static void main(String[] args) throws Exception
@@ -274,14 +185,15 @@ public class App
             if (failed)
                 System.exit(1);
 
-            sslCtx = SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ)).ciphers(!ciphers.isEmpty() ? ciphers : null, SupportedCipherSuiteFilter.INSTANCE).protocols(!protocols.isEmpty() ? protocols : null).build();
+            sslCtx = SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ)).ciphers(!ciphers.isEmpty() ? ciphers : Shared.TLS.defaultCipherSuites, SupportedCipherSuiteFilter.INSTANCE).protocols(!protocols.isEmpty() ? protocols : Shared.TLS.defaultProtocols).build();
             secret = generateSecret(pathSecret, Shared.magic);
             secret_3 = generateSecret_3(pathSecret_3 != null ? pathSecret_3 : pathSecret, Shared.magic);
         }
 
-        System.out.println(String.format("%s > Starting...", Shared.printNow()));
-        theServer = new MirrorPoint(bindAddress, targetAddresses, sslCtx, secret, secret_3);
-        System.out.println(String.format("%s > Done. [%s]", Shared.printNow(), theServer.toString()));
+        SimpleLogger.println("%s > Starting...", Shared.printNow());
+        theServer = new MirrorPoint(new MirrorPointConfig(bindAddress, targetAddresses, sslCtx, secret, secret_3));
+        theServer.start().syncUninterruptibly();
+        SimpleLogger.println("%s > Done. [%s]", Shared.printNow(), theServer.toString());
 
         bindAddress = null;
         targetAddresses = null;
@@ -301,11 +213,9 @@ public class App
             @Override
             public void run()
             {
-                System.out.println(String.format("%s > Shutting down...", Shared.printNow()));
-                Shared.NettyObjects.bossGroup.shutdownGracefully().syncUninterruptibly();
-                Shared.NettyObjects.workerGroup.shutdownGracefully().syncUninterruptibly();
-                theServer.getChannels().close().syncUninterruptibly();
-                System.out.println(String.format("%s > [%s] is now offline.", Shared.printNow(), theServer.toString()));
+                SimpleLogger.println("%s > Shutting down...", Shared.printNow());
+                Arrays.asList(Shared.NettyObjects.bossGroup.shutdownGracefully(), Shared.NettyObjects.workerGroup.shutdownGracefully(), theServer.stop()).forEach(Future::syncUninterruptibly);
+                SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
             }
 
         });

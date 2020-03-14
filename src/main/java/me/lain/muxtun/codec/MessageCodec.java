@@ -44,6 +44,8 @@ public class MessageCodec extends ChannelDuplexHandler
                 Object result = decoder.decode(ctx, cast);
                 if (result != null)
                     ctx.fireChannelRead(result);
+                else
+                    throw new Error("BadDecoder");
             }
             finally
             {
@@ -68,6 +70,8 @@ public class MessageCodec extends ChannelDuplexHandler
                 Object result = encoder.encode(ctx, cast);
                 if (result != null)
                     ctx.write(result, promise);
+                else
+                    throw new Error("BadEncoder");
             }
             finally
             {

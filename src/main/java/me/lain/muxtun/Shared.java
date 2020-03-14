@@ -7,10 +7,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import javax.net.ssl.SSLContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollDatagramChannel;
@@ -124,6 +129,38 @@ public final class Shared
         public static final Class<? extends ServerSocketChannel> classServerSocketChannel = Epoll.isAvailable() ? EpollServerSocketChannel.class : KQueue.isAvailable() ? KQueueServerSocketChannel.class : NioServerSocketChannel.class;
 
         private NettyObjects()
+        {
+        }
+
+    }
+
+    public static final class TLS
+    {
+
+        public static final List<String> defaultProtocols;
+        public static final List<String> defaultCipherSuites;
+
+        static
+        {
+            List<String> protocols = new ArrayList<>(Arrays.asList("TLSv1.3:TLSv1.2".split(":")));
+            List<String> cipherSuites = new ArrayList<>(Arrays.asList("TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256".split(":")));
+            try
+            {
+                protocols.retainAll(Arrays.asList(SSLContext.getDefault().getSupportedSSLParameters().getProtocols()));
+                cipherSuites.retainAll(Arrays.asList(SSLContext.getDefault().getSupportedSSLParameters().getCipherSuites()));
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+            finally
+            {
+                defaultProtocols = Collections.unmodifiableList(protocols);
+                defaultCipherSuites = Collections.unmodifiableList(cipherSuites);
+            }
+        }
+
+        private TLS()
         {
         }
 

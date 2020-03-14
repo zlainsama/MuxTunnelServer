@@ -66,6 +66,8 @@ public class MessageEncoder extends ChannelOutboundHandlerAdapter
                 Object result = encode(ctx, cast);
                 if (result != null)
                     ctx.write(result, promise);
+                else
+                    throw new Error("BadEncoder");
             }
             finally
             {
