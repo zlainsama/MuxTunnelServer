@@ -78,6 +78,9 @@ public class MessageDecoder extends ChannelInboundHandlerAdapter
                 return new Message()
                         .setType(MessageType.AuthReq_3)
                         .setPayload(msg.readableBytes() > 0 ? msg.readRetainedSlice(msg.readableBytes()) : Unpooled.EMPTY_BUFFER);
+            case Snappy:
+                return new Message()
+                        .setType(MessageType.Snappy);
             default:
                 throw new CorruptedFrameException("UnknownMessageType");
         }

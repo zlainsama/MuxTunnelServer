@@ -49,6 +49,9 @@ public class MessageEncoder extends ChannelOutboundHandlerAdapter
                 return ctx.alloc().buffer(1 + msg.getPayload().readableBytes())
                         .writeByte(MessageType.AuthReq_3.getId())
                         .writeBytes(msg.getPayload());
+            case Snappy:
+                return ctx.alloc().buffer(1)
+                        .writeByte(MessageType.Snappy.getId());
             default:
                 throw new IllegalArgumentException("UnknownMessageType");
         }

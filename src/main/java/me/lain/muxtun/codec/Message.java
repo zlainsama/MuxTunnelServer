@@ -19,6 +19,7 @@ public final class Message
         Auth((byte) 0x71),
         AuthReq((byte) 0x72),
         AuthReq_3((byte) 0x73),
+        Snappy((byte) 0xB3),
         Unknown((byte) 0xFF);
 
         private static final Map<Byte, MessageType> idMap = new HashMap<>();
