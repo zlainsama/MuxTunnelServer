@@ -216,6 +216,7 @@ public class App
                 SimpleLogger.println("%s > Shutting down...", Shared.printNow());
                 Arrays.asList(Shared.NettyObjects.bossGroup.shutdownGracefully(), Shared.NettyObjects.workerGroup.shutdownGracefully(), theServer.stop()).forEach(Future::syncUninterruptibly);
                 SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
+                SimpleLogger.flush();
             }
 
         });

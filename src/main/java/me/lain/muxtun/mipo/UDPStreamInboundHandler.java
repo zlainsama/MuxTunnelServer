@@ -43,7 +43,7 @@ class UDPStreamInboundHandler extends ChannelInboundHandlerAdapter
 
     private void handleMessage(ChannelHandlerContext ctx, DatagramPacket msg) throws Exception
     {
-        if (!ctx.channel().attr(Vars.WRITER_KEY).get().write(msg.content().retain()))
+        if (!ctx.channel().attr(Vars.WRITER_KEY).get().writeSlices(msg.content().retain(), 1048576, null))
             ctx.close();
     }
 

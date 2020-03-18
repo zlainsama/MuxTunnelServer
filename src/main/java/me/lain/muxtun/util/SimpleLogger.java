@@ -23,56 +23,94 @@ public final class SimpleLogger
     private static final AtomicReference<Optional<Writer>> fileOut = new AtomicReference<>(Optional.empty());
     private static final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
     private static final AtomicBoolean done = new AtomicBoolean(true);
+    private static final Runnable printer = new Runnable()
+    {
+
+        ManagedBlocker blocker = new ManagedBlocker()
+        {
+
+            @Override
+            public boolean block() throws InterruptedException
+            {
+                Runnable task;
+                while ((task = tasks.poll(50L, TimeUnit.MILLISECONDS)) != null)
+                {
+                    try
+                    {
+                        task.run();
+                    }
+                    catch (Throwable e)
+                    {
+                    }
+                }
+                return true;
+            }
+
+            @Override
+            public boolean isReleasable()
+            {
+                return tasks.isEmpty();
+            }
+
+        };
+
+        @Override
+        public void run()
+        {
+            while (!tasks.isEmpty() && done.compareAndSet(true, false))
+            {
+                try
+                {
+                    ForkJoinPool.managedBlock(blocker);
+                }
+                catch (InterruptedException e)
+                {
+                }
+                finally
+                {
+                    done.set(true);
+                }
+            }
+        }
+
+    };
+
+    public static void flush()
+    {
+        while (!tasks.isEmpty())
+        {
+            initiatePrinter();
+            forceSleep(50L);
+        }
+    }
+
+    private static void forceSleep(long millis)
+    {
+        long start = System.currentTimeMillis();
+
+        for (;;)
+        {
+            long elapsed = System.currentTimeMillis() - start;
+
+            if (elapsed >= millis)
+                break;
+
+            try
+            {
+                Thread.sleep(millis - elapsed);
+            }
+            catch (InterruptedException e)
+            {
+            }
+        }
+    }
 
     private static void initiatePrinter()
     {
         if (tasks.isEmpty() || !done.get())
             return;
 
-        ForkJoinPool.commonPool().submit(() -> {
-            if (!done.compareAndSet(true, false))
-                return;
-
-            try
-            {
-                ForkJoinPool.managedBlock(new ManagedBlocker()
-                {
-
-                    @Override
-                    public boolean block() throws InterruptedException
-                    {
-                        Runnable task;
-                        while ((task = tasks.poll(50L, TimeUnit.MILLISECONDS)) != null)
-                        {
-                            try
-                            {
-                                task.run();
-                            }
-                            catch (Throwable e)
-                            {
-                                e.printStackTrace();
-                            }
-                        }
-                        return true;
-                    }
-
-                    @Override
-                    public boolean isReleasable()
-                    {
-                        return tasks.isEmpty();
-                    }
-
-                });
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
-            finally
-            {
-                done.set(true);
-            }
-        });
+        ForkJoinPool.commonPool().submit(printer);
     }
 
     private static Optional<Writer> newWriter(Path path)
@@ -104,6 +142,7 @@ public final class SimpleLogger
                 catch (IOException e)
                 {
                     e.printStackTrace();
+                    setFileOut(null);
                 }
             });
         });
@@ -171,6 +210,7 @@ public final class SimpleLogger
                 catch (IOException e)
                 {
                     e.printStackTrace();
+                    setFileOut(null);
                 }
             });
         });
@@ -187,7 +227,8 @@ public final class SimpleLogger
     {
         try
         {
-            autocloseable.close();
+            if (autocloseable != null)
+                autocloseable.close();
         }
         catch (Exception e)
         {
