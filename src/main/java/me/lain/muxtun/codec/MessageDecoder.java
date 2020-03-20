@@ -1,12 +1,9 @@
 package me.lain.muxtun.codec;
 
-import java.util.UUID;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.util.ReferenceCountUtil;
 import me.lain.muxtun.codec.Message.MessageType;
 
@@ -44,45 +41,19 @@ public class MessageDecoder extends ChannelInboundHandlerAdapter
 
     protected Object decode(ChannelHandlerContext ctx, ByteBuf msg) throws Exception
     {
-        switch (MessageType.find(msg.readByte()))
+        boolean release = true;
+        Message result = null;
+        try
         {
-            case Ping:
-                return new Message()
-                        .setType(MessageType.Ping);
-            case Open:
-                return new Message()
-                        .setType(MessageType.Open)
-                        .setStreamId(new UUID(msg.readLong(), msg.readLong()));
-            case Data:
-                return new Message()
-                        .setType(MessageType.Data)
-                        .setStreamId(new UUID(msg.readLong(), msg.readLong()))
-                        .setPayload(msg.readableBytes() > 0 ? msg.readRetainedSlice(msg.readableBytes()) : Unpooled.EMPTY_BUFFER);
-            case Drop:
-                return new Message()
-                        .setType(MessageType.Drop)
-                        .setStreamId(new UUID(msg.readLong(), msg.readLong()));
-            case OpenUDP:
-                return new Message()
-                        .setType(MessageType.OpenUDP)
-                        .setStreamId(new UUID(msg.readLong(), msg.readLong()));
-            case Auth:
-                return new Message()
-                        .setType(MessageType.Auth)
-                        .setPayload(msg.readableBytes() > 0 ? msg.readRetainedSlice(msg.readableBytes()) : Unpooled.EMPTY_BUFFER);
-            case AuthReq:
-                return new Message()
-                        .setType(MessageType.AuthReq)
-                        .setPayload(msg.readableBytes() > 0 ? msg.readRetainedSlice(msg.readableBytes()) : Unpooled.EMPTY_BUFFER);
-            case AuthReq_3:
-                return new Message()
-                        .setType(MessageType.AuthReq_3)
-                        .setPayload(msg.readableBytes() > 0 ? msg.readRetainedSlice(msg.readableBytes()) : Unpooled.EMPTY_BUFFER);
-            case Snappy:
-                return new Message()
-                        .setType(MessageType.Snappy);
-            default:
-                throw new CorruptedFrameException("UnknownMessageType");
+            result = MessageType.find(msg.readByte()).create();
+            result.decode(msg);
+            release = false;
+            return result;
+        }
+        finally
+        {
+            if (release)
+                ReferenceCountUtil.release(result);
         }
     }
 

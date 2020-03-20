@@ -1,0 +1,126 @@
+package me.lain.muxtun.message;
+
+import java.util.UUID;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCounted;
+import me.lain.muxtun.codec.Message;
+
+public class MessageData implements Message, ReferenceCounted
+{
+
+    public static MessageData create()
+    {
+        return new MessageData();
+    }
+
+    private UUID streamId;
+    private ByteBuf payload;
+
+    private MessageData()
+    {
+    }
+
+    @Override
+    public void decode(ByteBuf buf) throws Exception
+    {
+        streamId = new UUID(buf.readLong(), buf.readLong());
+        payload = buf.readableBytes() > 0 ? buf.readRetainedSlice(buf.readableBytes()) : Unpooled.EMPTY_BUFFER;
+    }
+
+    @Override
+    public void encode(ByteBuf buf) throws Exception
+    {
+        buf.writeLong(streamId.getMostSignificantBits()).writeLong(streamId.getLeastSignificantBits());
+        buf.writeBytes(payload != null ? payload : Unpooled.EMPTY_BUFFER);
+    }
+
+    @Override
+    public ByteBuf getPayload()
+    {
+        return payload;
+    }
+
+    @Override
+    public UUID getStreamId()
+    {
+        return streamId;
+    }
+
+    @Override
+    public int refCnt()
+    {
+        if (payload != null)
+            return payload.refCnt();
+        return 1;
+    }
+
+    @Override
+    public boolean release()
+    {
+        if (payload != null)
+            return payload.release();
+        return false;
+    }
+
+    @Override
+    public boolean release(int decrement)
+    {
+        if (payload != null)
+            return payload.release(decrement);
+        return false;
+    }
+
+    @Override
+    public ReferenceCounted retain()
+    {
+        if (payload != null)
+            payload.retain();
+        return this;
+    }
+
+    @Override
+    public ReferenceCounted retain(int increment)
+    {
+        if (payload != null)
+            payload.retain(increment);
+        return this;
+    }
+
+    @Override
+    public MessageData setPayload(ByteBuf payload)
+    {
+        this.payload = payload;
+        return this;
+    }
+
+    @Override
+    public MessageData setStreamId(UUID requestId)
+    {
+        this.streamId = requestId;
+        return this;
+    }
+
+    @Override
+    public ReferenceCounted touch()
+    {
+        if (payload != null)
+            payload.touch();
+        return this;
+    }
+
+    @Override
+    public ReferenceCounted touch(Object hint)
+    {
+        if (payload != null)
+            payload.touch(hint);
+        return this;
+    }
+
+    @Override
+    public MessageType type()
+    {
+        return MessageType.DATA;
+    }
+
+}

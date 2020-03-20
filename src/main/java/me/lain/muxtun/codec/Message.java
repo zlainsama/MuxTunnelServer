@@ -1,45 +1,69 @@
 package me.lain.muxtun.codec;
 
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
-import java.util.UUID;
-import io.netty.buffer.ByteBuf;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import me.lain.muxtun.message.MessageAuth;
+import me.lain.muxtun.message.MessageAuthReq;
+import me.lain.muxtun.message.MessageAuthReq3;
+import me.lain.muxtun.message.MessageData;
+import me.lain.muxtun.message.MessageDrop;
+import me.lain.muxtun.message.MessageOpen;
+import me.lain.muxtun.message.MessageOpenUDP;
+import me.lain.muxtun.message.MessagePing;
+import me.lain.muxtun.message.MessageSnappy;
 
-public final class Message
+public interface Message extends MessageAccess
 {
 
-    public enum MessageType
+    @FunctionalInterface
+    interface MessageFactory
     {
 
-        Ping((byte) 0x31),
-        Open((byte) 0x32),
-        Data((byte) 0x33),
-        Drop((byte) 0x34),
-        OpenUDP((byte) 0x35),
-        Auth((byte) 0x71),
-        AuthReq((byte) 0x72),
-        AuthReq_3((byte) 0x73),
-        Snappy((byte) 0xB3),
-        Unknown((byte) 0xFF);
+        Message create();
 
-        private static final Map<Byte, MessageType> idMap = new HashMap<>();
+    }
 
-        static
+    enum MessageType
+    {
+
+        PING(0x31, MessagePing::create),
+        OPEN(0x32, MessageOpen::create),
+        DATA(0x33, MessageData::create),
+        DROP(0x34, MessageDrop::create),
+        OPENUDP(0x35, MessageOpenUDP::create),
+        AUTH(0x71, MessageAuth::create),
+        AUTHREQ(0x72, MessageAuthReq::create),
+        AUTHREQ3(0x73, MessageAuthReq3::create),
+        SNAPPY(0xB3, MessageSnappy::create),
+        UNKNOWN(0xFF, MessageType::createUnknown);
+
+        private static final Map<Byte, MessageType> idMap = Collections.unmodifiableMap(Arrays.stream(values()).collect(Collectors.toMap(MessageType::getId, Function.identity())));
+
+        private static Message createUnknown()
         {
-            for (MessageType type : values())
-                idMap.put(type.getId(), type);
+            throw new UnsupportedOperationException("UnknownMessageType");
         }
 
         public static MessageType find(byte id)
         {
-            return idMap.getOrDefault(id, Unknown);
+            return idMap.getOrDefault(id, UNKNOWN);
         }
 
         private final byte id;
+        private final MessageFactory factory;
 
-        private MessageType(byte id)
+        private MessageType(int id, MessageFactory factory)
         {
-            this.id = id;
+            this.id = (byte) id;
+            this.factory = factory;
+        }
+
+        public Message create()
+        {
+            return factory.create();
         }
 
         public byte getId()
@@ -49,41 +73,6 @@ public final class Message
 
     }
 
-    private MessageType type;
-    private UUID streamId;
-    private ByteBuf payload;
-
-    public ByteBuf getPayload()
-    {
-        return payload;
-    }
-
-    public UUID getStreamId()
-    {
-        return streamId;
-    }
-
-    public MessageType getType()
-    {
-        return type;
-    }
-
-    public Message setPayload(ByteBuf payload)
-    {
-        this.payload = payload;
-        return this;
-    }
-
-    public Message setStreamId(UUID streamId)
-    {
-        this.streamId = streamId;
-        return this;
-    }
-
-    public Message setType(MessageType type)
-    {
-        this.type = type;
-        return this;
-    }
+    MessageType type();
 
 }

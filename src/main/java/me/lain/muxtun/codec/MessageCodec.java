@@ -75,7 +75,7 @@ public class MessageCodec extends ChannelDuplexHandler
             }
             finally
             {
-                ReferenceCountUtil.release(cast.getPayload());
+                ReferenceCountUtil.release(cast);
             }
         }
         else
