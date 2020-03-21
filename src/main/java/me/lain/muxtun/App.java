@@ -185,7 +185,7 @@ public class App
             if (failed)
                 System.exit(1);
 
-            sslCtx = SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ)).ciphers(!ciphers.isEmpty() ? ciphers : Shared.TLS.defaultCipherSuites, SupportedCipherSuiteFilter.INSTANCE).protocols(!protocols.isEmpty() ? protocols : Shared.TLS.defaultProtocols).build();
+            sslCtx = SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ)).ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE).protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null).build();
             secret = generateSecret(pathSecret, Shared.magic);
             secret_3 = generateSecret_3(pathSecret_3 != null ? pathSecret_3 : pathSecret, Shared.magic);
         }
@@ -214,7 +214,10 @@ public class App
             public void run()
             {
                 SimpleLogger.println("%s > Shutting down...", Shared.printNow());
-                Arrays.asList(Shared.NettyObjects.bossGroup.shutdownGracefully(), Shared.NettyObjects.workerGroup.shutdownGracefully(), theServer.stop()).forEach(Future::syncUninterruptibly);
+                List<Future<?>> futures = new ArrayList<>();
+                futures.addAll(Shared.NettyObjects.shutdownGracefully());
+                futures.add(theServer.stop());
+                futures.forEach(Future::syncUninterruptibly);
                 SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
                 SimpleLogger.flush();
             }

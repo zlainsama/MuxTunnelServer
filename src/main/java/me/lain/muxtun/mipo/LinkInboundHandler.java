@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -31,7 +32,7 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
     private static ChannelFuture open(SocketAddress toOpen, Function<Channel, PayloadWriter> writerBuilder)
     {
         return new Bootstrap()
-                .group(Shared.NettyObjects.workerGroup)
+                .group(Vars.STREAMS)
                 .channel(Shared.NettyObjects.classSocketChannel)
                 .handler(TCPStreamInitializer.DEFAULT)
                 .option(ChannelOption.SO_KEEPALIVE, true)
@@ -53,7 +54,7 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
     private static ChannelFuture openUDP(SocketAddress toOpen, Function<Channel, PayloadWriter> writerBuilder)
     {
         return new Bootstrap()
-                .group(Shared.NettyObjects.workerGroup)
+                .group(Vars.STREAMS)
                 .channel(Shared.NettyObjects.classDatagramChannel)
                 .handler(UDPStreamInitializer.DEFAULT)
                 .connect(toOpen)
@@ -68,6 +69,16 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                     }
 
                 });
+    }
+
+    private static UUID randomUUID(Predicate<UUID> predicate)
+    {
+        for (;;)
+        {
+            UUID result;
+            if (predicate.test(result = UUID.randomUUID()))
+                return result;
+        }
     }
 
     @Override
@@ -129,7 +140,7 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         if (toOpen.isPresent())
                         {
                             open(toOpen.get(), stream -> {
-                                UUID streamId = UUID.randomUUID();
+                                UUID streamId = randomUUID(id -> !session.ongoingStreams.containsKey(id));
                                 if (ctx.channel().isActive())
                                 {
                                     session.ongoingStreams.put(streamId, stream);
@@ -217,7 +228,7 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         if (toOpen.isPresent())
                         {
                             openUDP(toOpen.get(), stream -> {
-                                UUID streamId = UUID.randomUUID();
+                                UUID streamId = randomUUID(id -> !session.ongoingStreams.containsKey(id));
                                 if (ctx.channel().isActive())
                                 {
                                     session.ongoingStreams.put(streamId, stream);

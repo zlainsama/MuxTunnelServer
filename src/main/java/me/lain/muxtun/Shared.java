@@ -9,12 +9,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.net.ssl.SSLContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.Epoll;
@@ -34,6 +38,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.concurrent.Future;
 
 public final class Shared
 {
@@ -122,11 +130,65 @@ public final class Shared
     public static final class NettyObjects
     {
 
-        public static final EventLoopGroup bossGroup = Epoll.isAvailable() ? new EpollEventLoopGroup(1) : KQueue.isAvailable() ? new KQueueEventLoopGroup(1) : new NioEventLoopGroup(1);
-        public static final EventLoopGroup workerGroup = Epoll.isAvailable() ? new EpollEventLoopGroup() : KQueue.isAvailable() ? new KQueueEventLoopGroup() : new NioEventLoopGroup();
+        private static final Map<String, EventLoopGroup> eventLoopGroups = new ConcurrentHashMap<>();
+        private static final Map<String, EventLoopGroup> eventLoopGroupsView = Collections.unmodifiableMap(eventLoopGroups);
+        private static final Map<String, EventExecutorGroup> eventExecutorGroups = new ConcurrentHashMap<>();
+        private static final Map<String, EventExecutorGroup> eventExecutorGroupsView = Collections.unmodifiableMap(eventExecutorGroups);
+
         public static final Class<? extends SocketChannel> classSocketChannel = Epoll.isAvailable() ? EpollSocketChannel.class : KQueue.isAvailable() ? KQueueSocketChannel.class : NioSocketChannel.class;
         public static final Class<? extends DatagramChannel> classDatagramChannel = Epoll.isAvailable() ? EpollDatagramChannel.class : KQueue.isAvailable() ? KQueueDatagramChannel.class : NioDatagramChannel.class;
         public static final Class<? extends ServerSocketChannel> classServerSocketChannel = Epoll.isAvailable() ? EpollServerSocketChannel.class : KQueue.isAvailable() ? KQueueServerSocketChannel.class : NioServerSocketChannel.class;
+
+        public static Map<String, EventExecutorGroup> getEventExecutorGroups()
+        {
+            return eventExecutorGroupsView;
+        }
+
+        public static Map<String, EventLoopGroup> getEventLoopGroups()
+        {
+            return eventLoopGroupsView;
+        }
+
+        public static EventExecutorGroup getOrCreateEventExecutorGroup(String name, int nThreads)
+        {
+            boolean[] created = new boolean[] { false };
+            EventExecutorGroup group = eventExecutorGroups.computeIfAbsent(name, unused -> {
+                created[0] = true;
+                return new DefaultEventExecutorGroup(nThreads, new DefaultThreadFactory(name));
+            });
+
+            if (created[0])
+            {
+                group.terminationFuture().addListener(future -> {
+                    if (future.isSuccess())
+                        eventExecutorGroups.remove(name, group);
+                });
+            }
+            return group;
+        }
+
+        public static EventLoopGroup getOrCreateEventLoopGroup(String name, int nThreads)
+        {
+            boolean[] created = new boolean[] { false };
+            EventLoopGroup group = eventLoopGroups.computeIfAbsent(name, unused -> {
+                created[0] = true;
+                return Epoll.isAvailable() ? new EpollEventLoopGroup(nThreads, new DefaultThreadFactory(name)) : KQueue.isAvailable() ? new KQueueEventLoopGroup(nThreads, new DefaultThreadFactory(name)) : new NioEventLoopGroup(nThreads, new DefaultThreadFactory(name));
+            });
+
+            if (created[0])
+            {
+                group.terminationFuture().addListener(future -> {
+                    if (future.isSuccess())
+                        eventLoopGroups.remove(name, group);
+                });
+            }
+            return group;
+        }
+
+        public static Collection<Future<?>> shutdownGracefully()
+        {
+            return Stream.concat(getEventLoopGroups().values().stream().map(EventLoopGroup::shutdownGracefully), getEventExecutorGroups().values().stream().map(EventExecutorGroup::shutdownGracefully)).collect(Collectors.toList());
+        }
 
         private NettyObjects()
         {

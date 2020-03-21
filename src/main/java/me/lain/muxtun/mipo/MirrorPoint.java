@@ -29,10 +29,10 @@ public class MirrorPoint
         return channels;
     }
 
-    public Future<Void> start()
+    public Future<?> start()
     {
         return new ServerBootstrap()
-                .group(Shared.NettyObjects.bossGroup, Shared.NettyObjects.workerGroup)
+                .group(Vars.BOSS, Vars.LINKS)
                 .channel(Shared.NettyObjects.classServerSocketChannel)
                 .childHandler(linkInitializer)
                 .option(ChannelOption.SO_BACKLOG, 1024)
@@ -52,7 +52,7 @@ public class MirrorPoint
                 });
     }
 
-    public Future<Void> stop()
+    public Future<?> stop()
     {
         return channels.close();
     }
