@@ -43,7 +43,7 @@ class TCPStreamInboundHandler extends ChannelInboundHandlerAdapter
 
     private void handleMessage(ChannelHandlerContext ctx, ByteBuf msg) throws Exception
     {
-        if (!ctx.channel().attr(Vars.WRITER_KEY).get().writeSlices(msg.retain(), 1048576, null))
+        if (!ctx.channel().attr(Vars.WRITER_KEY).get().writeSlices(msg.retain(), 65536, null))
             ctx.close();
     }
 

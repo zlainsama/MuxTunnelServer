@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -22,6 +21,8 @@ import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
 import me.lain.muxtun.codec.Message.MessageType;
 import me.lain.muxtun.codec.SnappyCodec;
+import me.lain.muxtun.mipo.StreamContext.DefaultStreamContext;
+import me.lain.muxtun.mipo.StreamContext.FlowControlledStreamContext;
 
 @Sharable
 class LinkInboundHandler extends ChannelInboundHandlerAdapter
@@ -69,16 +70,6 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                     }
 
                 });
-    }
-
-    private static UUID randomUUID(Predicate<UUID> predicate)
-    {
-        for (;;)
-        {
-            UUID result;
-            if (predicate.test(result = UUID.randomUUID()))
-                return result;
-        }
     }
 
     @Override
@@ -140,13 +131,13 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         if (toOpen.isPresent())
                         {
                             open(toOpen.get(), stream -> {
-                                UUID streamId = randomUUID(id -> !session.ongoingStreams.containsKey(id));
+                                UUID streamId = Shared.randomUUID(id -> !session.ongoingStreams.containsKey(id));
                                 if (ctx.channel().isActive())
                                 {
-                                    session.ongoingStreams.put(streamId, stream);
+                                    session.ongoingStreams.put(streamId, session.flowControl.get() ? new FlowControlledStreamContext(stream) : new DefaultStreamContext(stream));
                                     ctx.writeAndFlush(MessageType.OPEN.create().setStreamId(streamId));
                                     stream.closeFuture().addListener(future -> {
-                                        if (ctx.channel().isActive() && session.ongoingStreams.remove(streamId) == stream)
+                                        if (ctx.channel().isActive() && session.ongoingStreams.remove(streamId) != null)
                                             ctx.writeAndFlush(MessageType.DROP.create().setStreamId(streamId));
                                     });
                                 }
@@ -159,7 +150,12 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                                     {
                                         if (!ctx.channel().isActive())
                                             return false;
+                                        StreamContext sctx = session.ongoingStreams.get(streamId);
+                                        if (sctx == null)
+                                            return false;
+                                        int size = payload.readableBytes();
                                         ctx.writeAndFlush(MessageType.DATA.create().setStreamId(streamId).setPayload(payload.retain()));
+                                        sctx.updateWindowSize(i -> i - size);
                                         return true;
                                     }
                                     finally
@@ -190,11 +186,26 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         UUID streamId = msg.getStreamId();
                         ByteBuf payload = msg.getPayload();
 
-                        Channel toSend = session.ongoingStreams.get(streamId);
-                        if (toSend != null && toSend.isActive())
-                            toSend.writeAndFlush(payload.retain());
+                        StreamContext sctx = session.ongoingStreams.get(streamId);
+                        if (sctx != null && sctx.isActive())
+                        {
+                            int size = payload.readableBytes();
+                            sctx.writeAndFlush(payload.retain());
+                            int threshold = sctx.getThreshold();
+                            int received = sctx.updateReceived(i -> i + size);
+                            if (received >= threshold)
+                            {
+                                int increment = sctx.getNextIncrement();
+                                ctx.writeAndFlush(MessageType.UPDATEWINDOW.create().setStreamId(streamId).setWindowSizeIncrement(increment < 1048576 ? Math.min(increment + threshold, 1048576) : increment));
+                                sctx.updateReceived(i -> i - threshold);
+                                sctx.updateThreshold(i -> i < increment ? Math.min(i * 2, increment) : i);
+                                sctx.updateNextIncrement(i -> i < 1048576 ? Math.min(i * 2, 1048576) : i);
+                            }
+                        }
                         else
+                        {
                             ctx.writeAndFlush(MessageType.DROP.create().setStreamId(streamId));
+                        }
                     }
                     else
                     {
@@ -208,9 +219,9 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                     {
                         UUID streamId = msg.getStreamId();
 
-                        Channel toClose = session.ongoingStreams.remove(streamId);
-                        if (toClose != null && toClose.isActive())
-                            toClose.close();
+                        StreamContext sctx = session.ongoingStreams.remove(streamId);
+                        if (sctx != null && sctx.isActive())
+                            sctx.close();
                     }
                     else
                     {
@@ -228,13 +239,13 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         if (toOpen.isPresent())
                         {
                             openUDP(toOpen.get(), stream -> {
-                                UUID streamId = randomUUID(id -> !session.ongoingStreams.containsKey(id));
+                                UUID streamId = Shared.randomUUID(id -> !session.ongoingStreams.containsKey(id));
                                 if (ctx.channel().isActive())
                                 {
-                                    session.ongoingStreams.put(streamId, stream);
+                                    session.ongoingStreams.put(streamId, session.flowControl.get() ? new FlowControlledStreamContext(stream) : new DefaultStreamContext(stream));
                                     ctx.writeAndFlush(MessageType.OPENUDP.create().setStreamId(streamId));
                                     stream.closeFuture().addListener(future -> {
-                                        if (ctx.channel().isActive() && session.ongoingStreams.remove(streamId) == stream)
+                                        if (ctx.channel().isActive() && session.ongoingStreams.remove(streamId) != null)
                                             ctx.writeAndFlush(MessageType.DROP.create().setStreamId(streamId));
                                     });
                                 }
@@ -247,7 +258,12 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                                     {
                                         if (!ctx.channel().isActive())
                                             return false;
+                                        StreamContext sctx = session.ongoingStreams.get(streamId);
+                                        if (sctx == null)
+                                            return false;
+                                        int size = payload.readableBytes();
                                         ctx.writeAndFlush(MessageType.DATA.create().setStreamId(streamId).setPayload(payload.retain()));
+                                        sctx.updateWindowSize(i -> i - size);
                                         return true;
                                     }
                                     finally
@@ -263,6 +279,43 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         else
                         {
                             ctx.writeAndFlush(MessageType.DROP.create().setStreamId(requestId)).addListener(ChannelFutureListener.CLOSE);
+                        }
+                    }
+                    else
+                    {
+                        ctx.close();
+                    }
+                    break;
+                }
+                case UPDATEWINDOW:
+                {
+                    if (session.authStatus.completed)
+                    {
+                        UUID streamId = msg.getStreamId();
+                        int increment = msg.getWindowSizeIncrement();
+
+                        StreamContext sctx = session.ongoingStreams.get(streamId);
+                        if (sctx != null && sctx.isActive())
+                        {
+                            if (increment <= 0)
+                            {
+                                sctx.close();
+                            }
+                            else
+                            {
+                                boolean[] wasPositive = new boolean[] { false };
+                                if (sctx.updateWindowSize(i -> {
+                                    wasPositive[0] = i > 0;
+                                    return i += increment;
+                                }) < 0 && wasPositive[0])
+                                {
+                                    sctx.close();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            ctx.writeAndFlush(MessageType.DROP.create().setStreamId(streamId));
                         }
                     }
                     else
@@ -392,6 +445,14 @@ class LinkInboundHandler extends ChannelInboundHandlerAdapter
                         ctx.pipeline().addBefore("FrameCodec", "SnappyCodec", new SnappyCodec());
                     }
                     else
+                    {
+                        ctx.close();
+                    }
+                    break;
+                }
+                case FLOWCONTROL:
+                {
+                    if (!session.authStatus.completed || !session.flowControl.compareAndSet(false, true))
                     {
                         ctx.close();
                     }

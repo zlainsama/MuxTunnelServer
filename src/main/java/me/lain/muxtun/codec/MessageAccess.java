@@ -30,12 +30,22 @@ public interface MessageAccess
         throw new UnsupportedOperationException();
     }
 
+    default int getWindowSizeIncrement()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     default Message setPayload(ByteBuf payload)
     {
         throw new UnsupportedOperationException();
     }
 
     default Message setStreamId(UUID streamId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setWindowSizeIncrement(int increment)
     {
         throw new UnsupportedOperationException();
     }

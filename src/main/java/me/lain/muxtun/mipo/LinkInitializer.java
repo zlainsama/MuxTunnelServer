@@ -1,6 +1,5 @@
 package me.lain.muxtun.mipo;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelInitializer;
@@ -20,7 +19,7 @@ class LinkInitializer extends ChannelInitializer<SocketChannel>
 {
 
     private static final ChannelFutureListener CLOSESTREAMS = future -> {
-        future.channel().attr(Vars.SESSION_KEY).get().ongoingStreams.values().forEach(Channel::close);
+        future.channel().attr(Vars.SESSION_KEY).get().ongoingStreams.values().forEach(StreamContext::close);
     };
 
     private final MirrorPointConfig config;
