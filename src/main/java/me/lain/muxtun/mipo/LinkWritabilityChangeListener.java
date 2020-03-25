@@ -11,7 +11,12 @@ class LinkWritabilityChangeListener extends ChannelInboundHandlerAdapter
 {
 
     private static final Consumer<StreamContext> DISABLEAUTOREAD = sctx -> sctx.getChannel().config().setAutoRead(false);
-    private static final Consumer<StreamContext> UPDATEWINDOWSIZEWITHZEROINCREMENT = sctx -> sctx.updateWindowSize(IntUnaryOperator.identity());
+    private static final Consumer<StreamContext> NOTIFYWRITABLE = sctx -> {
+        if (sctx.getFlowControl().isPresent())
+            sctx.updateWindowSize(IntUnaryOperator.identity());
+        else
+            sctx.getChannel().config().setAutoRead(true);
+    };
 
     static final LinkWritabilityChangeListener DEFAULT = new LinkWritabilityChangeListener();
 
@@ -19,7 +24,7 @@ class LinkWritabilityChangeListener extends ChannelInboundHandlerAdapter
     public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception
     {
         if (ctx.channel().isWritable())
-            ctx.channel().attr(Vars.SESSION_KEY).get().ongoingStreams.values().forEach(UPDATEWINDOWSIZEWITHZEROINCREMENT);
+            ctx.channel().attr(Vars.SESSION_KEY).get().ongoingStreams.values().forEach(NOTIFYWRITABLE);
         else
             ctx.channel().attr(Vars.SESSION_KEY).get().ongoingStreams.values().forEach(DISABLEAUTOREAD);
 

@@ -15,10 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.net.ssl.SSLContext;
@@ -291,16 +289,6 @@ public final class Shared
     public static String printNow()
     {
         return dateFormat.format(LocalDateTime.now());
-    }
-
-    public static UUID randomUUID(Predicate<UUID> predicate)
-    {
-        for (;;)
-        {
-            UUID result;
-            if (predicate.test(result = UUID.randomUUID()))
-                return result;
-        }
     }
 
     private Shared()

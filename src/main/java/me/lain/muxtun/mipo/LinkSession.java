@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.group.ChannelGroup;
 import me.lain.muxtun.Shared;
@@ -44,6 +45,20 @@ class LinkSession
         ongoingStreams = new ConcurrentHashMap<>();
         authStatus = new LinkSessionAuthStatus();
         flowControl = new AtomicBoolean();
+    }
+
+    StreamContext newStreamContext(Channel channel, Function<UUID, FlowControl> flowControlBuilder)
+    {
+        for (;;)
+        {
+            boolean[] created = new boolean[] { false };
+            StreamContext sctx = ongoingStreams.computeIfAbsent(UUID.randomUUID(), streamId -> {
+                created[0] = true;
+                return new StreamContext(streamId, channel, flowControlBuilder.apply(streamId));
+            });
+            if (created[0])
+                return sctx;
+        }
     }
 
 }
