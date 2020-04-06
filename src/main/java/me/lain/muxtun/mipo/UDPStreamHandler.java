@@ -7,10 +7,10 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
 
 @Sharable
-class UDPStreamInboundHandler extends ChannelInboundHandlerAdapter
+class UDPStreamHandler extends ChannelInboundHandlerAdapter
 {
 
-    static final UDPStreamInboundHandler DEFAULT = new UDPStreamInboundHandler();
+    static final UDPStreamHandler DEFAULT = new UDPStreamHandler();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
@@ -21,7 +21,7 @@ class UDPStreamInboundHandler extends ChannelInboundHandlerAdapter
 
             try
             {
-                handleMessage(ctx, cast);
+                handleMessage(StreamContext.getContext(ctx.channel()), cast);
             }
             finally
             {
@@ -30,21 +30,22 @@ class UDPStreamInboundHandler extends ChannelInboundHandlerAdapter
         }
         else
         {
-            try
-            {
-                ctx.close();
-            }
-            finally
-            {
-                ReferenceCountUtil.release(msg);
-            }
+            ctx.fireChannelRead(msg);
         }
     }
 
-    private void handleMessage(ChannelHandlerContext ctx, DatagramPacket msg) throws Exception
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception
     {
-        if (!ctx.channel().attr(Vars.WRITER_KEY).get().writeSlices(msg.content().retain(), 65536, null))
-            ctx.close();
+        Vars.ChannelError.accumulate(ctx.channel(), cause);
+
+        ctx.close();
+    }
+
+    private void handleMessage(StreamContext sctx, DatagramPacket msg) throws Exception
+    {
+        if (sctx.isActive() && !sctx.getPayloadWriter().writeSlices(msg.content().retain(), 65536, null))
+            sctx.close();
     }
 
 }

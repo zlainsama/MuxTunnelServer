@@ -12,40 +12,42 @@ public interface MessageAccess
         return (T) this;
     }
 
-    default void decode(ByteBuf buf) throws Exception
-    {
-    }
-
-    default void encode(ByteBuf buf) throws Exception
-    {
-    }
-
-    default ByteBuf getPayload()
+    default int getAck()
     {
         throw new UnsupportedOperationException();
     }
 
-    default UUID getStreamId()
+    default ByteBuf getBuf()
     {
         throw new UnsupportedOperationException();
     }
 
-    default int getWindowSizeIncrement()
+    default UUID getId()
     {
         throw new UnsupportedOperationException();
     }
 
-    default Message setPayload(ByteBuf payload)
+    default int getSeq()
     {
         throw new UnsupportedOperationException();
     }
 
-    default Message setStreamId(UUID streamId)
+    default Message setAck(int ack)
     {
         throw new UnsupportedOperationException();
     }
 
-    default Message setWindowSizeIncrement(int increment)
+    default Message setBuf(ByteBuf buf)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setId(UUID id)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setSeq(int seq)
     {
         throw new UnsupportedOperationException();
     }

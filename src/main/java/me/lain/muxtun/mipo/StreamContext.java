@@ -1,28 +1,33 @@
 package me.lain.muxtun.mipo;
 
-import java.util.Optional;
 import java.util.UUID;
-import java.util.function.IntUnaryOperator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 
 class StreamContext
 {
 
-    private final UUID streamId;
-    private final Channel channel;
-    private final Optional<FlowControl> flowControl;
+    static StreamContext getContext(Channel channel)
+    {
+        return channel.attr(Vars.STREAMCONTEXT_KEY).get();
+    }
 
-    StreamContext(UUID streamId, Channel channel, FlowControl flowControl)
+    private final UUID streamId;
+    private final LinkSession session;
+    private final Channel channel;
+    private final PayloadWriter payloadWriter;
+
+    StreamContext(UUID streamId, LinkSession session, Channel channel)
     {
         this.streamId = streamId;
+        this.session = session;
         this.channel = channel;
-        this.flowControl = Optional.ofNullable(flowControl);
+        this.payloadWriter = session.newPayloadWriter(this);
     }
 
     ChannelFuture close()
     {
-        return channel.close();
+        return getChannel().close();
     }
 
     Channel getChannel()
@@ -30,9 +35,14 @@ class StreamContext
         return channel;
     }
 
-    Optional<FlowControl> getFlowControl()
+    PayloadWriter getPayloadWriter()
     {
-        return flowControl;
+        return payloadWriter;
+    }
+
+    LinkSession getSession()
+    {
+        return session;
     }
 
     UUID getStreamId()
@@ -42,22 +52,17 @@ class StreamContext
 
     boolean isActive()
     {
-        return channel.isActive();
+        return getChannel().isActive();
     }
 
-    int updateReceived(IntUnaryOperator updateFunction)
+    void windowUpdated(int window)
     {
-        return flowControl.map(fc -> fc.updateReceived(updateFunction)).orElse(0);
+        getChannel().config().setAutoRead(window > 0);
     }
 
-    int updateWindowSize(IntUnaryOperator updateFunction)
+    ChannelFuture writeAndFlush(Object msg)
     {
-        return flowControl.map(fc -> fc.updateWindowSize(updateFunction)).orElse(65536);
-    }
-
-    ChannelFuture writeAndFlush(Object msg) throws Exception
-    {
-        return channel.writeAndFlush(msg);
+        return getChannel().writeAndFlush(msg);
     }
 
 }

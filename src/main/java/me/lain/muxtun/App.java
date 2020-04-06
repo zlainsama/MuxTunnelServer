@@ -4,14 +4,9 @@ import java.io.BufferedReader;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.security.DigestOutputStream;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,8 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.util.concurrent.Future;
 import me.lain.muxtun.mipo.MirrorPoint;
 import me.lain.muxtun.mipo.MirrorPointConfig;
@@ -34,51 +27,16 @@ public class App
     private static Map<UUID, SocketAddress> targetAddresses = new HashMap<>();
     private static Path pathCert = null;
     private static Path pathKey = null;
+    private static List<String> trustSha1 = new ArrayList<>();
     private static List<String> ciphers = new ArrayList<>();
     private static List<String> protocols = new ArrayList<>();
-    private static Path pathSecret = null;
-    private static Path pathSecret_3 = null;
     private static SslContext sslCtx = null;
-    private static byte[] secret = null;
-    private static byte[] secret_3 = null;
     private static MirrorPoint theServer = null;
 
     private static void discardOut()
     {
         System.setOut(new PrintStream(Shared.voidStream));
         System.setErr(new PrintStream(Shared.voidStream));
-    }
-
-    private static byte[] generateSecret(Path path, byte[] magic)
-    {
-        try (FileChannel fc = FileChannel.open(path, StandardOpenOption.READ))
-        {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-
-            fc.transferTo(0L, Long.MAX_VALUE, Channels.newChannel(new DigestOutputStream(Shared.voidStream, md)));
-
-            return md.digest(magic);
-        }
-        catch (Exception e)
-        {
-            return null;
-        }
-    }
-
-    private static byte[] generateSecret_3(Path path, byte[] magic)
-    {
-        try (FileChannel fc = FileChannel.open(path, StandardOpenOption.READ))
-        {
-            MessageDigest md = MessageDigest.getInstance("SHA3-256");
-
-            fc.transferTo(0L, Long.MAX_VALUE, Channels.newChannel(new DigestOutputStream(Shared.voidStream, md)));
-
-            return md.digest(magic);
-        }
-        catch (Exception e)
-        {
-            return null;
-        }
     }
 
     private static Path init(String... args) throws Exception
@@ -153,6 +111,10 @@ public class App
                 {
                     pathKey = FileSystems.getDefault().getPath(value);
                 }
+                else if ("trustSha1".equals(name))
+                {
+                    trustSha1.add(value);
+                }
                 else if ("ciphers".equals(name))
                 {
                     ciphers.addAll(Arrays.asList(value.split(":")));
@@ -160,14 +122,6 @@ public class App
                 else if ("protocols".equals(name))
                 {
                     protocols.addAll(Arrays.asList(value.split(":")));
-                }
-                else if ("pathSecret".equals(name))
-                {
-                    pathSecret = FileSystems.getDefault().getPath(value);
-                }
-                else if ("pathSecret_3".equals(name))
-                {
-                    pathSecret_3 = FileSystems.getDefault().getPath(value);
                 }
             });
 
@@ -180,18 +134,16 @@ public class App
                 failed = true;
             if (pathKey == null)
                 failed = true;
-            if (pathSecret == null && pathSecret_3 == null)
+            if (trustSha1.isEmpty())
                 failed = true;
             if (failed)
                 System.exit(1);
 
-            sslCtx = SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ)).ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE).protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null).build();
-            secret = generateSecret(pathSecret, Shared.magic);
-            secret_3 = generateSecret_3(pathSecret_3 != null ? pathSecret_3 : pathSecret, Shared.magic);
+            sslCtx = MirrorPointConfig.buildContext(pathCert, pathKey, trustSha1, ciphers, protocols);
         }
 
         SimpleLogger.println("%s > Starting...", Shared.printNow());
-        theServer = new MirrorPoint(new MirrorPointConfig(bindAddress, targetAddresses, sslCtx, secret, secret_3));
+        theServer = new MirrorPoint(new MirrorPointConfig(bindAddress, targetAddresses, sslCtx));
         theServer.start().syncUninterruptibly();
         SimpleLogger.println("%s > Done. [%s]", Shared.printNow(), theServer.toString());
 
@@ -199,13 +151,10 @@ public class App
         targetAddresses = null;
         pathCert = null;
         pathKey = null;
+        trustSha1 = null;
         ciphers = null;
         protocols = null;
-        pathSecret = null;
-        pathSecret_3 = null;
         sslCtx = null;
-        secret = null;
-        secret_3 = null;
 
         Runtime.getRuntime().addShutdownHook(new Thread()
         {

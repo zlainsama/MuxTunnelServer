@@ -1,38 +1,75 @@
 package me.lain.muxtun.mipo;
 
+import java.io.IOException;
 import java.net.SocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.net.ssl.SSLException;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.handler.ssl.util.FingerprintTrustManagerFactory;
+import me.lain.muxtun.Shared;
 
 public class MirrorPointConfig
 {
 
-    final SocketAddress bindAddress;
-    final Map<UUID, SocketAddress> targetAddresses;
-    final SslContext sslCtx;
-    final byte[] secret;
-    final byte[] secret_3;
-    final String name;
-
-    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx, byte[] secret, byte[] secret_3)
+    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha1, List<String> ciphers, List<String> protocols) throws SSLException, IOException
     {
-        this(bindAddress, targetAddresses, sslCtx, secret, secret_3, "MirrorPoint");
+        return SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ))
+                .clientAuth(ClientAuth.REQUIRE)
+                .trustManager(new FingerprintTrustManagerFactory(trustSha1))
+                .ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE)
+                .protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null)
+                .build();
     }
 
-    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx, byte[] secret, byte[] secret_3, String name)
+    private final SocketAddress bindAddress;
+    private final Map<UUID, SocketAddress> targetAddresses;
+    private final SslContext sslCtx;
+    private final String name;
+
+    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx)
     {
-        if (bindAddress == null || targetAddresses == null || sslCtx == null || (secret == null && secret_3 == null) || name == null)
+        this(bindAddress, targetAddresses, sslCtx, "MirrorPoint");
+    }
+
+    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx, String name)
+    {
+        if (bindAddress == null || targetAddresses == null || sslCtx == null || name == null)
             throw new NullPointerException();
-        if (targetAddresses.isEmpty() || !sslCtx.isServer() || (secret != null && secret.length == 0) || (secret_3 != null && secret_3.length == 0) || name.isEmpty())
+        if (targetAddresses.isEmpty() || !sslCtx.isServer() || name.isEmpty())
             throw new IllegalArgumentException();
 
         this.bindAddress = bindAddress;
         this.targetAddresses = targetAddresses;
         this.sslCtx = sslCtx;
-        this.secret = secret;
-        this.secret_3 = secret_3;
         this.name = name;
+    }
+
+    public SocketAddress getBindAddress()
+    {
+        return bindAddress;
+    }
+
+    public String getName()
+    {
+        return name;
+    }
+
+    public SslContext getSslCtx()
+    {
+        return sslCtx;
+    }
+
+    public Map<UUID, SocketAddress> getTargetAddresses()
+    {
+        return targetAddresses;
     }
 
 }

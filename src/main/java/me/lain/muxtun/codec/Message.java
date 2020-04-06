@@ -5,17 +5,14 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import me.lain.muxtun.message.MessageAuth;
-import me.lain.muxtun.message.MessageAuthReq;
-import me.lain.muxtun.message.MessageAuthReq3;
-import me.lain.muxtun.message.MessageData;
-import me.lain.muxtun.message.MessageDrop;
-import me.lain.muxtun.message.MessageFlowControl;
-import me.lain.muxtun.message.MessageOpen;
-import me.lain.muxtun.message.MessageOpenUDP;
+import io.netty.buffer.ByteBuf;
+import me.lain.muxtun.message.MessageAcknowledge;
+import me.lain.muxtun.message.MessageCloseStream;
+import me.lain.muxtun.message.MessageDataStream;
+import me.lain.muxtun.message.MessageJoinSession;
+import me.lain.muxtun.message.MessageOpenStream;
+import me.lain.muxtun.message.MessageOpenStreamUDP;
 import me.lain.muxtun.message.MessagePing;
-import me.lain.muxtun.message.MessageSnappy;
-import me.lain.muxtun.message.MessageUpdateWindow;
 
 public interface Message extends MessageAccess
 {
@@ -31,17 +28,13 @@ public interface Message extends MessageAccess
     enum MessageType
     {
 
-        PING(0x31, MessagePing::create),
-        OPEN(0x32, MessageOpen::create),
-        DATA(0x33, MessageData::create),
-        DROP(0x34, MessageDrop::create),
-        OPENUDP(0x35, MessageOpenUDP::create),
-        UPDATEWINDOW(0x36, MessageUpdateWindow::create),
-        AUTH(0x71, MessageAuth::create),
-        AUTHREQ(0x72, MessageAuthReq::create),
-        AUTHREQ3(0x73, MessageAuthReq3::create),
-        SNAPPY(0xB3, MessageSnappy::create),
-        FLOWCONTROL(0xC1, MessageFlowControl::create),
+        PING(0x00, MessagePing::create),
+        JOINSESSION(0x20, MessageJoinSession::create),
+        OPENSTREAM(0x21, MessageOpenStream::create),
+        OPENSTREAMUDP(0x22, MessageOpenStreamUDP::create),
+        CLOSESTREAM(0x23, MessageCloseStream::create),
+        DATASTREAM(0x24, MessageDataStream::create),
+        ACKNOWLEDGE(0x25, MessageAcknowledge::create),
         UNKNOWN(0xFF, MessageType::createUnknown);
 
         private static final Map<Byte, MessageType> idMap = Collections.unmodifiableMap(Arrays.stream(values()).collect(Collectors.toMap(MessageType::getId, Function.identity())));
@@ -76,6 +69,10 @@ public interface Message extends MessageAccess
         }
 
     }
+
+    void decode(ByteBuf buf) throws Exception;
+
+    void encode(ByteBuf buf) throws Exception;
 
     MessageType type();
 

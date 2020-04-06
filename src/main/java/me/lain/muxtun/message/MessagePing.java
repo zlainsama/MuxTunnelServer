@@ -1,11 +1,12 @@
 package me.lain.muxtun.message;
 
+import io.netty.buffer.ByteBuf;
 import me.lain.muxtun.codec.Message;
 
 public class MessagePing implements Message
 {
 
-    private static final MessagePing INSTANCE = new MessagePing();
+    private static MessagePing INSTANCE = new MessagePing();
 
     public static MessagePing create()
     {
@@ -13,6 +14,16 @@ public class MessagePing implements Message
     }
 
     private MessagePing()
+    {
+    }
+
+    @Override
+    public void decode(ByteBuf buf) throws Exception
+    {
+    }
+
+    @Override
+    public void encode(ByteBuf buf) throws Exception
     {
     }
 
