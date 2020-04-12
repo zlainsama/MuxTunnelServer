@@ -18,7 +18,7 @@ public class FlowControl
 
     public FlowControl()
     {
-        this(128);
+        this(256);
     }
 
     public FlowControl(int windowSize)
@@ -46,6 +46,11 @@ public class FlowControl
 
             return Optional.empty();
         }
+    }
+
+    public int initialWindowSize()
+    {
+        return initialWindowSize;
     }
 
     public boolean inRange(int seq)

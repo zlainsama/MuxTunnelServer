@@ -2,15 +2,15 @@ package me.lain.muxtun.mipo;
 
 import java.net.SocketAddress;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,7 +52,7 @@ class LinkSession
     private final FlowControl flowControl;
     private final Map<Integer, Message> inboundBuffer;
     private final Map<Integer, Message> outboundBuffer;
-    private final Queue<IntFunction<Message>> pendingMessages;
+    private final Deque<IntFunction<Message>> pendingMessages;
     private final Set<Channel> members;
     private final ChannelFutureListener remover;
     private final AtomicReference<Future<?>> scheduledSelfClose;
@@ -68,7 +68,7 @@ class LinkSession
         this.flowControl = new FlowControl();
         this.inboundBuffer = new ConcurrentHashMap<>();
         this.outboundBuffer = new ConcurrentHashMap<>();
-        this.pendingMessages = new ConcurrentLinkedQueue<>();
+        this.pendingMessages = new ConcurrentLinkedDeque<>();
         this.members = Collections.newSetFromMap(new ConcurrentHashMap<Channel, Boolean>());
         this.remover = future -> drop(future.channel());
         this.scheduledSelfClose = new AtomicReference<>();
@@ -269,7 +269,7 @@ class LinkSession
         return outboundBuffer;
     }
 
-    Queue<IntFunction<Message>> getPendingMessages()
+    Deque<IntFunction<Message>> getPendingMessages()
     {
         return pendingMessages;
     }
@@ -568,9 +568,12 @@ class LinkSession
         {
             case OPENSTREAM:
             case OPENSTREAMUDP:
+                getPendingMessages().addFirst(seq -> msg.setSeq(seq));
+                return true;
             case CLOSESTREAM:
             case DATASTREAM:
-                return getPendingMessages().add(seq -> msg.setSeq(seq));
+                getPendingMessages().addLast(seq -> msg.setSeq(seq));
+                return true;
             default:
                 return false;
         }
