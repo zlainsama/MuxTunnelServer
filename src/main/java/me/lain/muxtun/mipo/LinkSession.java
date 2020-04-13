@@ -537,7 +537,7 @@ class LinkSession
         Optional.ofNullable(scheduledSelfClose.getAndSet(initiate ? getExecutor().schedule(() -> {
             if (getMembers().isEmpty())
                 close();
-        }, 30L, TimeUnit.SECONDS) : null)).ifPresent(future -> future.cancel(false));
+        }, 30L, TimeUnit.SECONDS) : null)).ifPresent(scheduled -> scheduled.cancel(false));
     }
 
     int updateReceived()

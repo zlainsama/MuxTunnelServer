@@ -1,12 +1,13 @@
 package me.lain.muxtun.util;
 
 import java.util.OptionalLong;
+import java.util.function.LongPredicate;
 
 public class RoundTripTimeMeasurement
 {
 
-    private volatile OptionalLong startTime = OptionalLong.empty();
-    private volatile OptionalLong lastResult = OptionalLong.empty();
+    protected volatile OptionalLong startTime = OptionalLong.empty();
+    protected volatile OptionalLong lastResult = OptionalLong.empty();
 
     public OptionalLong complete()
     {
@@ -45,6 +46,24 @@ public class RoundTripTimeMeasurement
         }
 
         return false;
+    }
+
+    public OptionalLong updateIf(LongPredicate predicate)
+    {
+        if (startTime.isPresent())
+        {
+            synchronized (this)
+            {
+                if (startTime.isPresent())
+                {
+                    long result = System.currentTimeMillis() - startTime.getAsLong();
+                    if (predicate.test(result))
+                        return lastResult = OptionalLong.of(result);
+                }
+            }
+        }
+
+        return OptionalLong.empty();
     }
 
 }
