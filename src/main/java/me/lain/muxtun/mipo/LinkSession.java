@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -34,8 +34,8 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.Timeout;
 import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.concurrent.Future;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
 import me.lain.muxtun.codec.Message.MessageType;
@@ -43,6 +43,8 @@ import me.lain.muxtun.util.FlowControl;
 
 class LinkSession
 {
+
+    private static final IntUnaryOperator decrementIfPositive = i -> i > 0 ? i - 1 : i;
 
     private final UUID sessionId;
     private final LinkManager manager;
@@ -55,7 +57,7 @@ class LinkSession
     private final Deque<IntFunction<Message>> pendingMessages;
     private final Set<Channel> members;
     private final ChannelFutureListener remover;
-    private final AtomicReference<Future<?>> scheduledSelfClose;
+    private final AtomicReference<Timeout> scheduledSelfClose;
     private final Map<UUID, StreamContext> streams;
 
     LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge)
@@ -77,14 +79,30 @@ class LinkSession
 
     void acknowledge(int ack)
     {
-        getFlowControl().acknowledge(ack).orElse(IntStream.empty()).forEach(seq -> {
-            Optional.ofNullable(getOutboundBuffer().remove(seq)).ifPresent(ReferenceCountUtil::release);
-        });
+        getFlowControl().acknowledge(ack).ifPresent(ints -> ints.forEach(seq -> {
+            Optional.ofNullable(getOutboundBuffer().remove(seq)).ifPresent(completed -> {
+                try
+                {
+                    switch (completed.type())
+                    {
+                        case DATASTREAM:
+                            Optional.ofNullable(getStreams().get(completed.getId())).ifPresent(context -> {
+                                context.updateQuota(i -> i + completed.getBuf().readableBytes());
+                            });
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                finally
+                {
+                    ReferenceCountUtil.release(completed);
+                }
+            });
+        }));
 
-        if (getFlowControl().window() > 0)
+        if (isActive() && getFlowControl().window() > 0 && !getPendingMessages().isEmpty())
             flush();
-        if (getFlowControl().window() > 0)
-            getStreams().values().forEach(context -> context.windowUpdated(getFlowControl().window()));
     }
 
     void close()
@@ -115,6 +133,8 @@ class LinkSession
                 while ((pending = pendingMessages.poll()) != null)
                     ReferenceCountUtil.release(pending.apply(0));
             }
+
+            System.gc();
         }
     }
 
@@ -210,18 +230,18 @@ class LinkSession
                                     LinkContext context = LinkContext.getContext(link.get());
                                     context.getCount().incrementAndGet();
                                     duplicate(msg).ifPresent(context::writeAndFlush);
-                                    getExecutor().schedule(this, context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                    Vars.TIMER.newTimeout(handle -> getExecutor().submit(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
                                 }
                                 else
                                 {
-                                    getExecutor().schedule(this, 1L, TimeUnit.SECONDS);
+                                    Vars.TIMER.newTimeout(handle -> getExecutor().submit(this), 1L, TimeUnit.SECONDS);
                                 }
                             }
                             else
                             {
                                 while (!seen.isEmpty())
                                 {
-                                    seen.removeAll(seen.stream().peek(channel -> LinkContext.getContext(channel).getCount().updateAndGet(i -> i > 0 ? i - 1 : i)).collect(Collectors.toList()));
+                                    seen.removeAll(seen.stream().peek(channel -> LinkContext.getContext(channel).getCount().updateAndGet(decrementIfPositive)).collect(Collectors.toList()));
                                 }
                             }
                         }
@@ -420,8 +440,9 @@ class LinkSession
             {
                 if (!isActive())
                     return false;
+                int size = payload.readableBytes();
                 writeAndFlush(MessageType.DATASTREAM.create().setId(context.getStreamId()).setBuf(payload.retain()));
-                context.windowUpdated(getFlowControl().window());
+                context.updateQuota(i -> i - size);
                 return true;
             }
             finally
@@ -534,10 +555,10 @@ class LinkSession
 
     void scheduledSelfClose(boolean initiate)
     {
-        Optional.ofNullable(scheduledSelfClose.getAndSet(initiate ? getExecutor().schedule(() -> {
+        Optional.ofNullable(scheduledSelfClose.getAndSet(initiate ? Vars.TIMER.newTimeout(handle -> getExecutor().submit(() -> {
             if (getMembers().isEmpty())
                 close();
-        }, 30L, TimeUnit.SECONDS) : null)).ifPresent(scheduled -> scheduled.cancel(false));
+        }), 30L, TimeUnit.SECONDS) : null)).ifPresent(Timeout::cancel);
     }
 
     int updateReceived()

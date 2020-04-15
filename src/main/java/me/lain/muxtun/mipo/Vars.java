@@ -3,6 +3,9 @@ package me.lain.muxtun.mipo;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.AttributeKey;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutorGroup;
 import me.lain.muxtun.Shared;
 
@@ -45,9 +48,11 @@ class Vars
     static final AttributeKey<LinkContext> LINKCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#LinkContext");
     static final AttributeKey<StreamContext> STREAMCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#StreamContext");
 
+    static final Timer TIMER = new HashedWheelTimer(new DefaultThreadFactory("timer", true));
+
     static final EventLoopGroup BOSS = Shared.NettyObjects.getOrCreateEventLoopGroup("bossGroup", 1);
     static final EventLoopGroup LINKS = Shared.NettyObjects.getOrCreateEventLoopGroup("linksGroup", 8);
     static final EventLoopGroup STREAMS = Shared.NettyObjects.getOrCreateEventLoopGroup("streamsGroup", 8);
-    static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventLoopGroup("sessionsGroup", 8);
+    static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventExecutorGroup("sessionsGroup", 8);
 
 }
