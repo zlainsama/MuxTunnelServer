@@ -3,10 +3,8 @@ package me.lain.muxtun.mipo;
 import java.net.SocketAddress;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,7 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -43,8 +40,6 @@ import me.lain.muxtun.util.FlowControl;
 
 class LinkSession
 {
-
-    private static final IntUnaryOperator decrementIfPositive = i -> i > 0 ? i - 1 : i;
 
     private final UUID sessionId;
     private final LinkManager manager;
@@ -79,15 +74,18 @@ class LinkSession
 
     void acknowledge(int ack)
     {
-        getFlowControl().acknowledge(ack).ifPresent(ints -> ints.forEach(seq -> {
-            Optional.ofNullable(getOutboundBuffer().remove(seq)).ifPresent(completed -> {
+        if (getFlowControl().acknowledge(getOutboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
+            Message removed = getOutboundBuffer().remove(seq);
+
+            if (removed != null)
+            {
                 try
                 {
-                    switch (completed.type())
+                    switch (removed.type())
                     {
                         case DATASTREAM:
-                            Optional.ofNullable(getStreams().get(completed.getId())).ifPresent(context -> {
-                                context.updateQuota(i -> i + completed.getBuf().readableBytes());
+                            Optional.ofNullable(getStreams().get(removed.getId())).ifPresent(context -> {
+                                context.updateQuota(i -> i + removed.getBuf().readableBytes());
                             });
                             break;
                         default:
@@ -96,12 +94,14 @@ class LinkSession
                 }
                 finally
                 {
-                    ReferenceCountUtil.release(completed);
+                    ReferenceCountUtil.release(removed);
                 }
-            });
-        }));
 
-        if (isActive() && getFlowControl().window() > 0 && !getPendingMessages().isEmpty())
+                return true;
+            }
+
+            return false;
+        }, ack) > 0 && isActive() && !getPendingMessages().isEmpty())
             flush();
     }
 
@@ -152,10 +152,10 @@ class LinkSession
         }
     }
 
-    synchronized boolean flush()
+    int flush()
     {
         if (!isActive())
-            return false;
+            return 0;
 
         int flushed = 0;
         while (getFlowControl().window() > 0 && !getPendingMessages().isEmpty())
@@ -163,30 +163,16 @@ class LinkSession
             if (!isActive())
                 break;
 
-            IntFunction<Message> pending = getPendingMessages().peek();
+            getFlowControl().tryAdvanceSequence(seq -> {
+                IntFunction<Message> pending = getPendingMessages().poll();
 
-            if (pending != null)
-            {
-                OptionalInt seq = getFlowControl().tryAdvanceSequence();
-
-                if (seq.isPresent() && getOutboundBuffer().compute(seq.getAsInt(), (key, value) -> {
-                    try
-                    {
-                        return pending.apply(key);
-                    }
-                    finally
-                    {
-                        ReferenceCountUtil.release(value);
-                    }
-                }) != null)
+                if (pending != null)
                 {
-                    flushed += 1;
-                    getPendingMessages().remove();
+                    if (getOutboundBuffer().put(seq, pending.apply(seq)) != null)
+                        throw new Error();
 
                     getExecutor().submit(new Runnable()
                     {
-
-                        Set<Channel> seen = new HashSet<>();
 
                         Optional<Message> duplicate(Message msg)
                         {
@@ -215,20 +201,19 @@ class LinkSession
                         @Override
                         public void run()
                         {
-                            Message msg = getOutboundBuffer().get(seq.getAsInt());
+                            Message msg = getOutboundBuffer().get(seq);
 
-                            if (msg != null)
+                            if (msg != null && isActive())
                             {
                                 Optional<Channel> link = getMembers().stream()
                                         .filter(channel -> channel.isActive() && channel.isWritable())
                                         .sorted(LinkContext.SORTER)
-                                        .filter(channel -> seen.add(channel))
+                                        .filter(channel -> LinkContext.getContext(channel).getTasks().putIfAbsent(seq, this) == null)
                                         .findFirst();
 
                                 if (link.isPresent())
                                 {
                                     LinkContext context = LinkContext.getContext(link.get());
-                                    context.getCount().incrementAndGet();
                                     duplicate(msg).ifPresent(context::writeAndFlush);
                                     Vars.TIMER.newTimeout(handle -> getExecutor().submit(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
                                 }
@@ -239,19 +224,20 @@ class LinkSession
                             }
                             else
                             {
-                                while (!seen.isEmpty())
-                                {
-                                    seen.removeAll(seen.stream().peek(channel -> LinkContext.getContext(channel).getCount().updateAndGet(decrementIfPositive)).collect(Collectors.toList()));
-                                }
+                                getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
                             }
                         }
 
                     });
+
+                    return true;
                 }
-            }
+
+                return false;
+            });
         }
 
-        return flushed > 0;
+        return flushed;
     }
 
     byte[] getChallenge()
@@ -585,18 +571,30 @@ class LinkSession
 
     boolean write(Message msg)
     {
-        switch (msg.type())
+        try
         {
-            case OPENSTREAM:
-            case OPENSTREAMUDP:
-                getPendingMessages().addFirst(seq -> msg.setSeq(seq));
-                return true;
-            case CLOSESTREAM:
-            case DATASTREAM:
-                getPendingMessages().addLast(seq -> msg.setSeq(seq));
-                return true;
-            default:
+            if (!isActive())
                 return false;
+
+            switch (msg.type())
+            {
+                case OPENSTREAM:
+                case OPENSTREAMUDP:
+                    ReferenceCountUtil.retain(msg);
+                    getPendingMessages().addFirst(seq -> msg.setSeq(seq));
+                    return true;
+                case CLOSESTREAM:
+                case DATASTREAM:
+                    ReferenceCountUtil.retain(msg);
+                    getPendingMessages().addLast(seq -> msg.setSeq(seq));
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        finally
+        {
+            ReferenceCountUtil.release(msg);
         }
     }
 

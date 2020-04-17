@@ -1,9 +1,10 @@
 package me.lain.muxtun.mipo;
 
 import java.util.Comparator;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -16,7 +17,7 @@ class LinkContext
 
     static final Comparator<Channel> SORTER = Comparator.comparingLong(channel -> {
         LinkContext context = LinkContext.getContext(channel);
-        return context.getSRTT().get() * (1 + context.getCount().get());
+        return context.getSRTT().get() * (1 + context.getTasks().size());
     });
 
     static LinkContext getContext(Channel channel)
@@ -29,7 +30,7 @@ class LinkContext
     private final RoundTripTimeMeasurement RTTM;
     private final AtomicReference<Timeout> scheduledMeasurementTimeoutUpdater;
     private final SmoothedRoundTripTime SRTT;
-    private final AtomicInteger count;
+    private final Map<Integer, Runnable> tasks;
     private volatile LinkSession session;
 
     LinkContext(LinkManager manager, Channel channel)
@@ -39,7 +40,7 @@ class LinkContext
         this.RTTM = new RoundTripTimeMeasurement();
         this.scheduledMeasurementTimeoutUpdater = new AtomicReference<>();
         this.SRTT = new SmoothedRoundTripTime();
-        this.count = new AtomicInteger();
+        this.tasks = new ConcurrentHashMap<>();
     }
 
     ChannelFuture close()
@@ -50,11 +51,6 @@ class LinkContext
     Channel getChannel()
     {
         return channel;
-    }
-
-    AtomicInteger getCount()
-    {
-        return count;
     }
 
     LinkManager getManager()
@@ -75,6 +71,11 @@ class LinkContext
     SmoothedRoundTripTime getSRTT()
     {
         return SRTT;
+    }
+
+    Map<Integer, Runnable> getTasks()
+    {
+        return tasks;
     }
 
     boolean isActive()

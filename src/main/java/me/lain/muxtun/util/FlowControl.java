@@ -1,8 +1,7 @@
 package me.lain.muxtun.util;
 
-import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.function.IntConsumer;
+import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
 public class FlowControl
@@ -13,7 +12,6 @@ public class FlowControl
     private final int initialWindowSize;
     private volatile int window;
     private volatile int sequence;
-    private volatile int lastAck;
     private volatile int expect;
 
     public FlowControl()
@@ -29,22 +27,11 @@ public class FlowControl
         window = windowSize;
     }
 
-    public Optional<IntStream> acknowledge(int ack)
+    public int acknowledge(IntStream outbound, IntPredicate remover, int ack)
     {
         synchronized (local)
         {
-            int inc = ack - lastAck;
-
-            if (inc > 0 && sequence - ack >= 0)
-            {
-                int base = lastAck;
-                IntStream toComplete = IntStream.range(0, inc).map(i -> base + i);
-                lastAck = ack;
-                window += inc;
-                return Optional.of(toComplete);
-            }
-
-            return Optional.empty();
+            return window += Math.toIntExact(outbound.map(i -> i - ack).filter(i -> i < 0).map(i -> ack + i).filter(remover).count());
         }
     }
 
@@ -59,28 +46,26 @@ public class FlowControl
         return diff >= 0 && diff < initialWindowSize;
     }
 
-    public OptionalInt tryAdvanceSequence()
+    public int tryAdvanceSequence(IntPredicate consumer)
     {
         synchronized (local)
         {
-            if (window > 0)
+            if (window > 0 && consumer.test(sequence))
             {
-                int seq = sequence;
                 window -= 1;
                 sequence += 1;
-                return OptionalInt.of(seq);
             }
 
-            return OptionalInt.empty();
+            return window;
         }
     }
 
-    public int updateReceived(IntStream received, IntConsumer packetIssuer, IntConsumer packetDiscarder)
+    public int updateReceived(IntStream inbound, IntConsumer issuer, IntConsumer discarder)
     {
         synchronized (remote)
         {
             int base = expect;
-            received.map(i -> i - base).sorted().map(i -> base + i).sequential().filter(i -> {
+            inbound.map(i -> i - base).sorted().map(i -> base + i).sequential().filter(i -> {
                 if (i == expect)
                 {
                     expect += 1;
@@ -88,11 +73,11 @@ public class FlowControl
                 }
                 else if (expect - i > 0)
                 {
-                    packetDiscarder.accept(i);
+                    discarder.accept(i);
                 }
 
                 return false;
-            }).forEach(packetIssuer);
+            }).forEach(issuer);
 
             return expect;
         }
