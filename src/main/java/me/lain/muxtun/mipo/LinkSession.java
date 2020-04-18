@@ -152,12 +152,19 @@ class LinkSession
         }
     }
 
-    int flush()
+    void flush()
     {
         if (!isActive())
-            return 0;
+            return;
 
-        int flushed = 0;
+        if (getExecutor().inEventLoop())
+            flush0();
+        else
+            getExecutor().submit(this::flush0);
+    }
+
+    private void flush0()
+    {
         while (getFlowControl().window() > 0 && !getPendingMessages().isEmpty())
         {
             if (!isActive())
@@ -168,8 +175,11 @@ class LinkSession
 
                 if (pending != null)
                 {
-                    if (getOutboundBuffer().put(seq, pending.apply(seq)) != null)
-                        throw new Error();
+                    if (getOutboundBuffer().putIfAbsent(seq, pending.apply(seq)) != null)
+                    {
+                        ReferenceCountUtil.release(pending.apply(0));
+                        throw new Error("OverlappedSequenceId " + seq);
+                    }
 
                     getExecutor().submit(new Runnable()
                     {
@@ -236,8 +246,6 @@ class LinkSession
                 return false;
             });
         }
-
-        return flushed;
     }
 
     byte[] getChallenge()
