@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import io.netty.bootstrap.Bootstrap;
@@ -73,6 +74,17 @@ class LinkSession
     }
 
     void acknowledge(int ack)
+    {
+        if (!isActive())
+            return;
+
+        if (getExecutor().inEventLoop())
+            acknowledge(ack);
+        else
+            getExecutor().submit(() -> acknowledge0(ack));
+    }
+
+    private void acknowledge0(int ack)
     {
         if (getFlowControl().acknowledge(getOutboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
             Message removed = getOutboundBuffer().remove(seq);
@@ -160,7 +172,7 @@ class LinkSession
         if (getExecutor().inEventLoop())
             flush0();
         else
-            getExecutor().submit(this::flush0);
+            getExecutor().submit(() -> flush0());
     }
 
     private void flush0()
@@ -555,9 +567,20 @@ class LinkSession
         }), 30L, TimeUnit.SECONDS) : null)).ifPresent(Timeout::cancel);
     }
 
-    int updateReceived()
+    void updateReceived(IntConsumer acknowledger)
     {
-        return getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
+        if (!isActive())
+            return;
+
+        if (getExecutor().inEventLoop())
+            updateReceived0(acknowledger);
+        else
+            getExecutor().submit(() -> updateReceived(acknowledger));
+    }
+
+    private void updateReceived0(IntConsumer acknowledger)
+    {
+        acknowledger.accept(getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
             Optional.ofNullable(getInboundBuffer().remove(seq)).ifPresent(msg -> {
                 try
                 {
@@ -574,7 +597,7 @@ class LinkSession
             });
         }, seq -> {
             Optional.ofNullable(getInboundBuffer().remove(seq)).ifPresent(ReferenceCountUtil::release);
-        });
+        }));
     }
 
     boolean write(Message msg)
