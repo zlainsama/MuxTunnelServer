@@ -18,6 +18,12 @@ public class MessageAcknowledge implements Message
     }
 
     @Override
+    public Message copy()
+    {
+        return type().create().setAck(getAck());
+    }
+
+    @Override
     public void decode(ByteBuf buf) throws Exception
     {
         setAck(buf.readInt());

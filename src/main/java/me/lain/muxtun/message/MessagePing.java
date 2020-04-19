@@ -18,6 +18,12 @@ public class MessagePing implements Message
     }
 
     @Override
+    public Message copy()
+    {
+        return type().create();
+    }
+
+    @Override
     public void decode(ByteBuf buf) throws Exception
     {
     }

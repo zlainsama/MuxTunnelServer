@@ -70,6 +70,8 @@ public interface Message extends MessageAccess
 
     }
 
+    Message copy();
+
     void decode(ByteBuf buf) throws Exception;
 
     void encode(ByteBuf buf) throws Exception;

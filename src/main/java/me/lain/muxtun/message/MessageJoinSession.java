@@ -21,6 +21,12 @@ public class MessageJoinSession implements Message, ReferenceCounted
     }
 
     @Override
+    public Message copy()
+    {
+        return type().create().setId(getId()).setBuf(Vars.safeDuplicate(getBuf()));
+    }
+
+    @Override
     public void decode(ByteBuf buf) throws Exception
     {
         if (buf.readableBytes() < 16)

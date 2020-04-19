@@ -22,6 +22,12 @@ public class MessageDataStream implements Message, ReferenceCounted
     }
 
     @Override
+    public Message copy()
+    {
+        return type().create().setSeq(getSeq()).setId(getId()).setBuf(Vars.safeDuplicate(getBuf()));
+    }
+
+    @Override
     public void decode(ByteBuf buf) throws Exception
     {
         setSeq(buf.readInt());

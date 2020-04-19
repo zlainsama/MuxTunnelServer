@@ -20,6 +20,12 @@ public class MessageOpenStreamUDP implements Message
     }
 
     @Override
+    public Message copy()
+    {
+        return type().create().setSeq(getSeq()).setId(getId());
+    }
+
+    @Override
     public void decode(ByteBuf buf) throws Exception
     {
         setSeq(buf.readInt());
