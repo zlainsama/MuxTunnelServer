@@ -405,21 +405,22 @@ class LinkSession
                 if (getClosedStreams().add(streamId))
                 {
                     Vars.TIMER.newTimeout(handle -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
-                    StreamContext context = getStreams().remove(streamId);
-                    if (context != null)
-                    {
-                        context.close();
-                    }
-
-                    getPendingMessages().removeIf(pending -> {
-                        Message tmp = pending.apply(0);
-                        return MessageType.DATASTREAM == tmp.type() && streamId.equals(tmp.getId());
-                    });
-                    getOutboundBuffer().values().stream()
-                            .filter(sending -> MessageType.DATASTREAM == sending.type() && streamId.equals(sending.getId()))
-                            .map(Message::getBuf)
-                            .forEach(buf -> buf.skipBytes(buf.readableBytes()));
                 }
+
+                StreamContext context = getStreams().remove(streamId);
+                if (context != null)
+                {
+                    context.close();
+                }
+
+                getPendingMessages().removeIf(pending -> {
+                    Message tmp = pending.apply(0);
+                    return MessageType.DATASTREAM == tmp.type() && streamId.equals(tmp.getId());
+                });
+                getOutboundBuffer().values().stream()
+                        .filter(sending -> MessageType.DATASTREAM == sending.type() && streamId.equals(sending.getId()))
+                        .map(Message::getBuf)
+                        .forEach(buf -> buf.skipBytes(buf.readableBytes()));
                 break;
             }
             case DATASTREAM:
@@ -432,7 +433,8 @@ class LinkSession
                     StreamContext context = getStreams().get(streamId);
                     if (context != null)
                     {
-                        context.writeAndFlush(payload.retain());
+                        if (payload.readableBytes() > 0)
+                            context.writeAndFlush(payload.retain());
                     }
                     else
                     {

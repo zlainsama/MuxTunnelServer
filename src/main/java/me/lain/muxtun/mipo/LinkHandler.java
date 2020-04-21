@@ -65,7 +65,7 @@ class LinkHandler extends ChannelDuplexHandler
                     {
                         UUID id = msg.getId();
                         ByteBuf buf = msg.getBuf();
-                        byte[] challenge = buf != null ? ByteBufUtil.getBytes(buf.readSlice(buf.readableBytes())) : null;
+                        byte[] challenge = buf != null ? ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false) : null;
 
                         if (challenge != null && challenge.length <= 4096)
                         {
@@ -82,7 +82,7 @@ class LinkHandler extends ChannelDuplexHandler
                                 {
                                     created[0] = true;
 
-                                    if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge)).join(lctx.getChannel()))
+                                    if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone())).join(lctx.getChannel()))
                                     {
                                         lctx.setSession(value);
                                     }

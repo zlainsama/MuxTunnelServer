@@ -12,6 +12,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.net.ssl.SSLContext;
@@ -106,6 +108,31 @@ public final class Shared
 
         private NettyObjects()
         {
+        }
+
+    }
+
+    public static final class RoundRobinSupplier<T> implements Supplier<T>
+    {
+
+        public static <T> RoundRobinSupplier<T> of(Collection<Supplier<T>> suppliers)
+        {
+            return new RoundRobinSupplier<>(suppliers);
+        }
+
+        private final List<Supplier<T>> suppliers;
+        private final AtomicInteger index;
+
+        private RoundRobinSupplier(Collection<Supplier<T>> suppliers)
+        {
+            this.suppliers = Collections.unmodifiableList(new ArrayList<>(suppliers));
+            this.index = new AtomicInteger();
+        }
+
+        @Override
+        public T get()
+        {
+            return suppliers.get(Math.abs(index.getAndIncrement() % suppliers.size())).get();
         }
 
     }
