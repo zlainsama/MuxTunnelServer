@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
-import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -50,7 +49,7 @@ class LinkSession
     private final FlowControl flowControl;
     private final Map<Integer, Message> inboundBuffer;
     private final Map<Integer, Message> outboundBuffer;
-    private final Deque<IntFunction<Message>> pendingMessages;
+    private final Deque<Message> pendingMessages;
     private final Set<Channel> members;
     private final ChannelFutureListener remover;
     private final AtomicReference<Timeout> scheduledSelfClose;
@@ -152,9 +151,7 @@ class LinkSession
             }
             while (!pendingMessages.isEmpty())
             {
-                IntFunction<Message> pending;
-                while ((pending = pendingMessages.poll()) != null)
-                    ReferenceCountUtil.release(pending.apply(0));
+                pendingMessages.removeAll(pendingMessages.stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
             }
 
             System.gc();
@@ -194,13 +191,13 @@ class LinkSession
                 break;
 
             getFlowControl().tryAdvanceSequence(seq -> {
-                IntFunction<Message> pending = getPendingMessages().poll();
+                Message pending = getPendingMessages().poll();
 
                 if (pending != null)
                 {
-                    if (getOutboundBuffer().putIfAbsent(seq, pending.apply(seq)) != null)
+                    if (getOutboundBuffer().putIfAbsent(seq, pending.setSeq(seq)) != null)
                     {
-                        ReferenceCountUtil.release(pending.apply(0));
+                        ReferenceCountUtil.release(pending);
                         throw new Error("OverlappedSequenceId " + seq);
                     }
 
@@ -299,7 +296,7 @@ class LinkSession
         return outboundBuffer;
     }
 
-    Deque<IntFunction<Message>> getPendingMessages()
+    Deque<Message> getPendingMessages()
     {
         return pendingMessages;
     }
@@ -413,10 +410,10 @@ class LinkSession
                     context.close();
                 }
 
-                getPendingMessages().removeIf(pending -> {
-                    Message tmp = pending.apply(0);
-                    return MessageType.DATASTREAM == tmp.type() && streamId.equals(tmp.getId());
-                });
+                getPendingMessages().removeAll(getPendingMessages().stream()
+                        .filter(pending -> MessageType.DATASTREAM == pending.type() && streamId.equals(pending.getId()))
+                        .peek(ReferenceCountUtil::release)
+                        .collect(Collectors.toList()));
                 getOutboundBuffer().values().stream()
                         .filter(sending -> MessageType.DATASTREAM == sending.type() && streamId.equals(sending.getId()))
                         .map(Message::getBuf)
@@ -649,14 +646,12 @@ class LinkSession
             {
                 case OPENSTREAM:
                 {
-                    ReferenceCountUtil.retain(msg);
-                    getPendingMessages().addFirst(seq -> msg.setSeq(seq));
+                    getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
                     return true;
                 }
                 case OPENSTREAMUDP:
                 {
-                    ReferenceCountUtil.retain(msg);
-                    getPendingMessages().addFirst(seq -> msg.setSeq(seq));
+                    getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
                     return true;
                 }
                 case CLOSESTREAM:
@@ -666,14 +661,12 @@ class LinkSession
                     if (getClosedStreams().add(streamId))
                     {
                         Vars.TIMER.newTimeout(handle -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
-                        ReferenceCountUtil.retain(msg);
-                        getPendingMessages().addLast(seq -> msg.setSeq(seq));
+                        getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
                     }
                     else if (force)
                     {
-                        ReferenceCountUtil.retain(msg);
-                        getPendingMessages().addLast(seq -> msg.setSeq(seq));
+                        getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
                     }
                     else
@@ -687,8 +680,7 @@ class LinkSession
 
                     if (!getClosedStreams().contains(streamId) || force)
                     {
-                        ReferenceCountUtil.retain(msg);
-                        getPendingMessages().addLast(seq -> msg.setSeq(seq));
+                        getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
                     }
                     else
