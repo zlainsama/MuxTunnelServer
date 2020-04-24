@@ -88,7 +88,7 @@ class LinkHandler extends ChannelDuplexHandler
                                     }
                                     else
                                     {
-                                        value.scheduledSelfClose(true);
+                                        lctx.close();
                                     }
                                 }
 

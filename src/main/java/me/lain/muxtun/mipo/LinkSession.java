@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
@@ -31,7 +31,6 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.Timeout;
 import io.netty.util.concurrent.EventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
@@ -52,9 +51,9 @@ class LinkSession
     private final Deque<Message> pendingMessages;
     private final Set<Channel> members;
     private final ChannelFutureListener remover;
-    private final AtomicReference<Timeout> scheduledSelfClose;
     private final Map<UUID, StreamContext> streams;
     private final Set<UUID> closedStreams;
+    private final AtomicInteger timeoutCounter;
 
     LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge)
     {
@@ -69,9 +68,9 @@ class LinkSession
         this.pendingMessages = new ConcurrentLinkedDeque<>();
         this.members = Collections.newSetFromMap(new ConcurrentHashMap<Channel, Boolean>());
         this.remover = future -> drop(future.channel());
-        this.scheduledSelfClose = new AtomicReference<>();
         this.streams = new ConcurrentHashMap<>();
         this.closedStreams = Collections.newSetFromMap(new ConcurrentHashMap<UUID, Boolean>());
+        this.timeoutCounter = new AtomicInteger();
     }
 
     void acknowledge(int ack)
@@ -128,34 +127,33 @@ class LinkSession
 
     private void close0()
     {
-        if (closed.compareAndSet(false, true))
+        closed.set(true);
+
+        manager.getSessions().remove(sessionId, this);
+
+        while (!members.isEmpty())
         {
-            manager.getSessions().remove(sessionId, this);
-
-            while (!members.isEmpty())
-            {
-                members.removeAll(members.stream().peek(Channel::close).collect(Collectors.toList()));
-            }
-            while (!streams.isEmpty())
-            {
-                streams.values().removeAll(streams.values().stream().peek(StreamContext::close).collect(Collectors.toList()));
-            }
-            closedStreams.clear();
-            while (!inboundBuffer.isEmpty())
-            {
-                inboundBuffer.values().removeAll(inboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
-            }
-            while (!outboundBuffer.isEmpty())
-            {
-                outboundBuffer.values().removeAll(outboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
-            }
-            while (!pendingMessages.isEmpty())
-            {
-                pendingMessages.removeAll(pendingMessages.stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
-            }
-
-            System.gc();
+            members.removeAll(members.stream().peek(Channel::close).collect(Collectors.toList()));
         }
+        while (!streams.isEmpty())
+        {
+            streams.values().removeAll(streams.values().stream().peek(StreamContext::close).collect(Collectors.toList()));
+        }
+        closedStreams.clear();
+        while (!inboundBuffer.isEmpty())
+        {
+            inboundBuffer.values().removeAll(inboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
+        }
+        while (!outboundBuffer.isEmpty())
+        {
+            outboundBuffer.values().removeAll(outboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
+        }
+        while (!pendingMessages.isEmpty())
+        {
+            pendingMessages.removeAll(pendingMessages.stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
+        }
+
+        System.gc();
     }
 
     boolean drop(Channel channel)
@@ -163,7 +161,6 @@ class LinkSession
         if (getMembers().remove(channel))
         {
             channel.closeFuture().removeListener(remover);
-            scheduledSelfClose(getMembers().isEmpty());
             return true;
         }
         else
@@ -309,6 +306,11 @@ class LinkSession
     Map<UUID, StreamContext> getStreams()
     {
         return streams;
+    }
+
+    AtomicInteger getTimeoutCounter()
+    {
+        return timeoutCounter;
     }
 
     void handleMessage(Message msg)
@@ -457,7 +459,6 @@ class LinkSession
         if (getMembers().add(channel))
         {
             channel.closeFuture().addListener(remover);
-            scheduledSelfClose(getMembers().isEmpty());
             return true;
         }
         else
@@ -587,14 +588,6 @@ class LinkSession
                     }
 
                 });
-    }
-
-    void scheduledSelfClose(boolean initiate)
-    {
-        Optional.ofNullable(scheduledSelfClose.getAndSet(initiate ? Vars.TIMER.newTimeout(handle -> getExecutor().submit(() -> {
-            if (getMembers().isEmpty())
-                close();
-        }), 30L, TimeUnit.SECONDS) : null)).ifPresent(Timeout::cancel);
     }
 
     void updateReceived(IntConsumer acknowledger)

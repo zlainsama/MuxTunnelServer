@@ -1,6 +1,8 @@
 package me.lain.muxtun.mipo;
 
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -25,6 +27,7 @@ public class MirrorPoint
     private final MirrorPointConfig config;
     private final ChannelGroup channels;
     private final LinkManager manager;
+    private final AtomicReference<Future<?>> scheduledMaintainTask;
 
     public MirrorPoint(MirrorPointConfig config)
     {
@@ -36,6 +39,7 @@ public class MirrorPoint
         }, requestId -> {
             return Optional.ofNullable(config.getTargetAddresses().get(requestId));
         }));
+        this.scheduledMaintainTask = new AtomicReference<>();
     }
 
     public ChannelGroup getChannels()
@@ -80,12 +84,25 @@ public class MirrorPoint
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .bind(config.getBindAddress())
-                .addListener(manager.getResources().getChannelAccumulator());
+                .addListener(manager.getResources().getChannelAccumulator())
+                .addListener(future -> {
+                    if (future.isSuccess())
+                        Optional.ofNullable(scheduledMaintainTask.getAndSet(GlobalEventExecutor.INSTANCE.scheduleWithFixedDelay(() -> {
+                            manager.getSessions().values().forEach(session -> {
+                                if (!session.getMembers().isEmpty())
+                                    session.getTimeoutCounter().set(0);
+                                else if (session.getTimeoutCounter().incrementAndGet() > 30)
+                                    session.close();
+                            });
+                        }, 1L, 1L, TimeUnit.SECONDS))).ifPresent(scheduled -> scheduled.cancel(false));
+                    else
+                        stop();
+                });
     }
 
     public Future<?> stop()
     {
-        return channels.close();
+        return channels.close().addListener(future -> Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false)));
     }
 
     @Override

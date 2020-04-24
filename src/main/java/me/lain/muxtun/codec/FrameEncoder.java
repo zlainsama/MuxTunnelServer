@@ -1,32 +1,23 @@
 package me.lain.muxtun.codec;
 
-import java.util.List;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.codec.MessageToByteEncoder;
 
-public class FrameEncoder extends LengthFieldPrepender
+public class FrameEncoder extends MessageToByteEncoder<ByteBuf>
 {
 
-    public FrameEncoder()
-    {
-        super(3);
-    }
-
     @Override
-    protected void encode(ChannelHandlerContext ctx, ByteBuf msg, List<Object> out) throws Exception
+    protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out) throws Exception
     {
-        super.encode(ctx, msg, out);
+        int i = msg.readableBytes();
+        int j = Vars.computeVarIntSize(i);
 
-        if (out.size() > 1)
-        {
-            CompositeByteBuf buf = ctx.alloc().compositeBuffer(out.size());
-            for (int i = 0; i < out.size(); i++)
-                buf.addComponent(true, (ByteBuf) out.get(i));
-            out.clear();
-            out.add(buf);
-        }
+        if (j > 3)
+            throw new IllegalArgumentException("MessageTooBig " + i);
+
+        out.ensureWritable(j + i);
+        Vars.writeVarInt(out, i).writeBytes(msg, msg.readerIndex(), i);
     }
 
 }
