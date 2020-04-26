@@ -79,9 +79,9 @@ class LinkSession
             return;
 
         if (getExecutor().inEventLoop())
-            acknowledge(ack);
+            acknowledge0(ack);
         else
-            getExecutor().submit(() -> acknowledge0(ack));
+            getExecutor().execute(() -> acknowledge0(ack));
     }
 
     private void acknowledge0(int ack)
@@ -122,7 +122,7 @@ class LinkSession
         if (getExecutor().inEventLoop())
             close0();
         else
-            getExecutor().submit(() -> close0());
+            getExecutor().execute(() -> close0());
     }
 
     private void close0()
@@ -177,7 +177,7 @@ class LinkSession
         if (getExecutor().inEventLoop())
             flush0();
         else
-            getExecutor().submit(() -> flush0());
+            getExecutor().execute(() -> flush0());
     }
 
     private void flush0()
@@ -198,7 +198,7 @@ class LinkSession
                         throw new Error("OverlappedSequenceId " + seq);
                     }
 
-                    getExecutor().submit(new Runnable()
+                    getExecutor().execute(new Runnable()
                     {
 
                         Optional<Message> duplicate(Message msg)
@@ -230,11 +230,11 @@ class LinkSession
                                 {
                                     LinkContext context = LinkContext.getContext(link.get());
                                     duplicate(msg).ifPresent(context::writeAndFlush);
-                                    Vars.TIMER.newTimeout(handle -> getExecutor().submit(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                    Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
                                 }
                                 else
                                 {
-                                    Vars.TIMER.newTimeout(handle -> getExecutor().submit(this), 1L, TimeUnit.SECONDS);
+                                    Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), 1L, TimeUnit.SECONDS);
                                 }
                             }
                             else
@@ -318,7 +318,7 @@ class LinkSession
         if (getExecutor().inEventLoop())
             handleMessage0(msg);
         else
-            getExecutor().submit(() -> handleMessage0(msg));
+            getExecutor().execute(() -> handleMessage0(msg));
     }
 
     private void handleMessage0(Message msg)
@@ -506,7 +506,7 @@ class LinkSession
     ChannelFuture openStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
     {
         return new Bootstrap()
-                .group(Vars.STREAMS)
+                .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classSocketChannel)
                 .handler(new ChannelInitializer<SocketChannel>()
                 {
@@ -545,7 +545,7 @@ class LinkSession
     ChannelFuture openStreamUDP(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
     {
         return new Bootstrap()
-                .group(Vars.STREAMS)
+                .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classDatagramChannel)
                 .handler(new ChannelInitializer<DatagramChannel>()
                 {
@@ -598,7 +598,7 @@ class LinkSession
         if (getExecutor().inEventLoop())
             updateReceived0(acknowledger);
         else
-            getExecutor().submit(() -> updateReceived(acknowledger));
+            getExecutor().execute(() -> updateReceived0(acknowledger));
     }
 
     private void updateReceived0(IntConsumer acknowledger)

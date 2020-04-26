@@ -18,7 +18,6 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.FrameCodec;
 import me.lain.muxtun.codec.MessageCodec;
-import me.lain.muxtun.codec.SnappyCodec;
 import me.lain.muxtun.util.SimpleLogger;
 
 public class MirrorPoint
@@ -50,7 +49,7 @@ public class MirrorPoint
     public Future<?> start()
     {
         return new ServerBootstrap()
-                .group(Vars.BOSS, Vars.LINKS)
+                .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classServerSocketChannel)
                 .childHandler(new ChannelInitializer<SocketChannel>()
                 {
@@ -64,7 +63,10 @@ public class MirrorPoint
                             ch.eventLoop().execute(() -> {
                                 Throwable error = Vars.ChannelError.get(ch);
                                 if (error != null)
+                                {
+                                    error.printStackTrace();
                                     SimpleLogger.println("%s > [%s] link %s closed with unexpected error. (%s)", Shared.printNow(), config.getName(), ch.id(), error);
+                                }
                             });
                         });
 
@@ -73,7 +75,6 @@ public class MirrorPoint
                         ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc()));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
                         ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
-                        ch.pipeline().addLast(new SnappyCodec());
                         ch.pipeline().addLast(new FrameCodec());
                         ch.pipeline().addLast(MessageCodec.DEFAULT);
                         ch.pipeline().addLast(LinkHandler.DEFAULT);
