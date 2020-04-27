@@ -103,7 +103,10 @@ public class MirrorPoint
 
     public Future<?> stop()
     {
-        return channels.close().addListener(future -> Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false)));
+        return channels.close().addListener(future -> {
+            manager.getSessions().values().forEach(LinkSession::close);
+            Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false));
+        });
     }
 
     @Override

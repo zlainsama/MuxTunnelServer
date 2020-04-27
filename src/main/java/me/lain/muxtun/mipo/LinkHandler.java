@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -95,7 +96,7 @@ class LinkHandler extends ChannelDuplexHandler
                                 return value;
                             }) == lctx.getSession())
                             {
-                                lctx.writeAndFlush(MessageType.JOINSESSION.create().setId(id).setBuf(lctx.getChannel().alloc().buffer(1).writeBoolean(created[0])));
+                                lctx.writeAndFlush(MessageType.JOINSESSION.create().setId(id).setBuf(Unpooled.buffer(1).writeBoolean(created[0])));
                             }
                             else
                             {
@@ -122,7 +123,7 @@ class LinkHandler extends ChannelDuplexHandler
 
                         if (session.getFlowControl().inRange(seq))
                             session.getInboundBuffer().computeIfAbsent(seq, key -> ReferenceCountUtil.retain(msg));
-                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack)));
+                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack).setSAck(seq)));
                     }
                     else
                     {
@@ -139,7 +140,7 @@ class LinkHandler extends ChannelDuplexHandler
 
                         if (session.getFlowControl().inRange(seq))
                             session.getInboundBuffer().computeIfAbsent(seq, key -> ReferenceCountUtil.retain(msg));
-                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack)));
+                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack).setSAck(seq)));
                     }
                     else
                     {
@@ -156,7 +157,7 @@ class LinkHandler extends ChannelDuplexHandler
 
                         if (session.getFlowControl().inRange(seq))
                             session.getInboundBuffer().computeIfAbsent(seq, key -> ReferenceCountUtil.retain(msg));
-                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack)));
+                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack).setSAck(seq)));
                     }
                     else
                     {
@@ -173,7 +174,7 @@ class LinkHandler extends ChannelDuplexHandler
 
                         if (session.getFlowControl().inRange(seq))
                             session.getInboundBuffer().computeIfAbsent(seq, key -> ReferenceCountUtil.retain(msg));
-                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack)));
+                        session.updateReceived(ack -> lctx.writeAndFlush(MessageType.ACKNOWLEDGE.create().setAck(ack).setSAck(seq)));
                     }
                     else
                     {
@@ -189,8 +190,9 @@ class LinkHandler extends ChannelDuplexHandler
                         lctx.scheduledMeasurementTimeoutUpdater(false);
                         LinkSession session = lctx.getSession();
                         int ack = msg.getAck();
+                        int sack = msg.getSAck();
 
-                        session.acknowledge(ack);
+                        session.acknowledge(ack, sack);
                     }
                     else
                     {

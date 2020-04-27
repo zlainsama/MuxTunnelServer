@@ -12,6 +12,7 @@ public class MessageAcknowledge implements Message
     }
 
     private int ack;
+    private int sack;
 
     private MessageAcknowledge()
     {
@@ -20,19 +21,36 @@ public class MessageAcknowledge implements Message
     @Override
     public Message copy()
     {
-        return type().create().setAck(getAck());
+        return type().create().setAck(getAck()).setSAck(getSAck());
     }
 
     @Override
     public void decode(ByteBuf buf) throws Exception
     {
-        setAck(buf.readInt());
+        if (buf.readableBytes() > 4)
+        {
+            setAck(buf.readInt());
+            setSAck(buf.readInt());
+        }
+        else
+        {
+            setAck(buf.readInt());
+            setSAck(getAck() - 1);
+        }
     }
 
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        buf.writeInt(getAck());
+        if (getAck() < getSAck())
+        {
+            buf.writeInt(getAck());
+            buf.writeInt(getSAck());
+        }
+        else
+        {
+            buf.writeInt(getAck());
+        }
     }
 
     @Override
@@ -42,9 +60,22 @@ public class MessageAcknowledge implements Message
     }
 
     @Override
+    public int getSAck()
+    {
+        return sack;
+    }
+
+    @Override
     public MessageAcknowledge setAck(int ack)
     {
         this.ack = ack;
+        return this;
+    }
+
+    @Override
+    public MessageAcknowledge setSAck(int sack)
+    {
+        this.sack = sack;
         return this;
     }
 

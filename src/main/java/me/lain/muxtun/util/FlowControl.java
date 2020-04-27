@@ -27,11 +27,12 @@ public class FlowControl
         window = windowSize;
     }
 
-    public int acknowledge(IntStream outbound, IntPredicate remover, int ack)
+    public int acknowledge(IntStream outbound, IntPredicate remover, int ack, int sack)
     {
         synchronized (local)
         {
-            return window += Math.toIntExact(outbound.map(i -> i - ack).filter(i -> i < 0).map(i -> ack + i).filter(remover).count());
+            int sackDiff = sack - ack;
+            return window += Math.toIntExact(outbound.map(i -> i - ack).filter(i -> i < 0 || i == sackDiff).map(i -> ack + i).filter(remover).count());
         }
     }
 

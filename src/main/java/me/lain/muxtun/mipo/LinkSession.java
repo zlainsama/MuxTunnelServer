@@ -73,18 +73,18 @@ class LinkSession
         this.timeoutCounter = new AtomicInteger();
     }
 
-    void acknowledge(int ack)
+    void acknowledge(int ack, int sack)
     {
         if (!isActive())
             return;
 
         if (getExecutor().inEventLoop())
-            acknowledge0(ack);
+            acknowledge0(ack, sack);
         else
-            getExecutor().execute(() -> acknowledge0(ack));
+            getExecutor().execute(() -> acknowledge0(ack, sack));
     }
 
-    private void acknowledge0(int ack)
+    private void acknowledge0(int ack, int sack)
     {
         if (getFlowControl().acknowledge(getOutboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
             Message removed = getOutboundBuffer().remove(seq);
@@ -96,10 +96,14 @@ class LinkSession
                     switch (removed.type())
                     {
                         case DATASTREAM:
-                            Optional.ofNullable(getStreams().get(removed.getId())).ifPresent(context -> {
+                        {
+                            StreamContext context = getStreams().get(removed.getId());
+
+                            if (context != null)
                                 context.updateQuota(i -> i + removed.getBuf().readableBytes());
-                            });
+
                             break;
+                        }
                         default:
                             break;
                     }
@@ -113,7 +117,7 @@ class LinkSession
             }
 
             return false;
-        }, ack) > 0 && isActive() && !getPendingMessages().isEmpty())
+        }, ack, sack) > 0 && isActive() && !getPendingMessages().isEmpty())
             flush();
     }
 
@@ -321,8 +325,11 @@ class LinkSession
             getExecutor().execute(() -> handleMessage0(msg));
     }
 
-    private void handleMessage0(Message msg)
+    private Message handleMessage0(Message msg)
     {
+        if (msg == null)
+            return null;
+
         switch (msg.type())
         {
             case OPENSTREAM:
@@ -359,6 +366,7 @@ class LinkSession
                 {
                     writeAndFlush(MessageType.OPENSTREAM.create());
                 }
+
                 break;
             }
             case OPENSTREAMUDP:
@@ -395,6 +403,7 @@ class LinkSession
                 {
                     writeAndFlush(MessageType.OPENSTREAMUDP.create());
                 }
+
                 break;
             }
             case CLOSESTREAM:
@@ -420,6 +429,7 @@ class LinkSession
                         .filter(sending -> MessageType.DATASTREAM == sending.type() && streamId.equals(sending.getId()))
                         .map(Message::getBuf)
                         .forEach(buf -> buf.skipBytes(buf.readableBytes()));
+
                 break;
             }
             case DATASTREAM:
@@ -432,14 +442,14 @@ class LinkSession
                     StreamContext context = getStreams().get(streamId);
                     if (context != null)
                     {
-                        if (payload.readableBytes() > 0)
-                            context.writeAndFlush(payload.retain());
+                        context.writeAndFlush(payload.retain());
                     }
                     else
                     {
                         writeAndFlush(MessageType.CLOSESTREAM.create().setId(streamId));
                     }
                 }
+
                 break;
             }
             default:
@@ -447,6 +457,8 @@ class LinkSession
                 break;
             }
         }
+
+        return msg;
     }
 
     boolean isActive()
@@ -604,22 +616,9 @@ class LinkSession
     private void updateReceived0(IntConsumer acknowledger)
     {
         acknowledger.accept(getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
-            Optional.ofNullable(getInboundBuffer().remove(seq)).ifPresent(msg -> {
-                try
-                {
-                    handleMessage(msg);
-                }
-                catch (Throwable e)
-                {
-                    e.printStackTrace();
-                }
-                finally
-                {
-                    ReferenceCountUtil.release(msg);
-                }
-            });
+            ReferenceCountUtil.release(handleMessage0(getInboundBuffer().remove(seq)));
         }, seq -> {
-            Optional.ofNullable(getInboundBuffer().remove(seq)).ifPresent(ReferenceCountUtil::release);
+            ReferenceCountUtil.release(getInboundBuffer().remove(seq));
         }));
     }
 
