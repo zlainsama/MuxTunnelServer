@@ -23,7 +23,7 @@ public class MessageJoinSession implements Message, ReferenceCounted
     @Override
     public Message copy()
     {
-        return type().create().setId(getId()).setBuf(Vars.safeDuplicate(getBuf()));
+        return type().create().setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override

@@ -44,7 +44,7 @@ class UDPStreamHandler extends ChannelInboundHandlerAdapter
 
     private void handleMessage(StreamContext sctx, DatagramPacket msg) throws Exception
     {
-        if (sctx.isActive() && !sctx.getPayloadWriter().writeSlices(msg.content().retain(), 65536, null))
+        if (sctx.isActive() && !sctx.getPayloadWriter().writeSlices(msg.content().retain()))
             sctx.close();
     }
 

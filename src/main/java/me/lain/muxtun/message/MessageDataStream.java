@@ -24,7 +24,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     @Override
     public Message copy()
     {
-        return type().create().setSeq(getSeq()).setId(getId()).setBuf(Vars.safeDuplicate(getBuf()));
+        return type().create().setSeq(getSeq()).setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override

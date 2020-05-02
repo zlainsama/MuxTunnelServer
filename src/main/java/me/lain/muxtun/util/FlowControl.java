@@ -12,6 +12,7 @@ public class FlowControl
     private final int initialWindowSize;
     private volatile int window;
     private volatile int sequence;
+    private volatile int lastAck;
     private volatile int expect;
 
     public FlowControl()
@@ -27,12 +28,15 @@ public class FlowControl
         window = windowSize;
     }
 
-    public int acknowledge(IntStream outbound, IntPredicate remover, int ack, int sack)
+    public int acknowledge(IntStream outbound, IntConsumer remover, int ack, int sack)
     {
         synchronized (local)
         {
+            int inc = Math.max(0, ack - lastAck);
+            lastAck += inc;
             int sackDiff = sack - ack;
-            return window += Math.toIntExact(outbound.map(i -> i - ack).filter(i -> i < 0 || i == sackDiff).map(i -> ack + i).filter(remover).count());
+            outbound.map(i -> i - ack).filter(i -> i < 0 || i == sackDiff).map(i -> ack + i).forEach(remover);
+            return window += inc;
         }
     }
 
