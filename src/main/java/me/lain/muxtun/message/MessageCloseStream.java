@@ -66,6 +66,12 @@ public class MessageCloseStream implements Message
     }
 
     @Override
+    public int size()
+    {
+        return 20;
+    }
+
+    @Override
     public MessageType type()
     {
         return MessageType.CLOSESTREAM;

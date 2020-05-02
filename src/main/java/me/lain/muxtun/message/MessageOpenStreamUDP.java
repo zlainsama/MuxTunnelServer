@@ -68,6 +68,12 @@ public class MessageOpenStreamUDP implements Message
     }
 
     @Override
+    public int size()
+    {
+        return getId() != null ? 20 : 4;
+    }
+
+    @Override
     public MessageType type()
     {
         return MessageType.OPENSTREAMUDP;

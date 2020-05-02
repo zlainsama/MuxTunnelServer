@@ -32,7 +32,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     {
         setSeq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
-        setBuf(buf.readRetainedSlice(buf.readableBytes()));
+        setBuf(buf.readBytes(buf.readableBytes()));
     }
 
     @Override
@@ -120,6 +120,12 @@ public class MessageDataStream implements Message, ReferenceCounted
     {
         this.seq = seq;
         return this;
+    }
+
+    @Override
+    public int size()
+    {
+        return 20 + Vars.getSize(getBuf());
     }
 
     @Override

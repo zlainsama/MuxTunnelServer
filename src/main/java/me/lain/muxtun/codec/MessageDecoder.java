@@ -1,59 +1,48 @@
 package me.lain.muxtun.codec;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.util.ReferenceCountUtil;
 import me.lain.muxtun.codec.Message.MessageType;
 
-@ChannelHandler.Sharable
-public class MessageDecoder extends ChannelInboundHandlerAdapter
+public class MessageDecoder extends LengthFieldBasedFrameDecoder
 {
 
-    public static final MessageDecoder DEFAULT = new MessageDecoder();
+    public MessageDecoder()
+    {
+        super(1048576, 0, 3, 0, 3);
+        setCumulator(COMPOSITE_CUMULATOR);
+    }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
+    protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception
     {
-        if (msg instanceof ByteBuf)
+        Object obj = super.decode(ctx, in);
+
+        if (obj instanceof ByteBuf)
         {
-            ByteBuf cast = (ByteBuf) msg;
+            ByteBuf buf = (ByteBuf) obj;
+            Message msg = null;
+            boolean release = true;
 
             try
             {
-                Object result = decode(ctx, cast);
-                if (result != null)
-                    ctx.fireChannelRead(result);
-                else
-                    throw new Error("BadDecoder");
+                msg = MessageType.find(buf.readByte()).create();
+                msg.decode(buf);
+                release = false;
+                return msg;
             }
             finally
             {
-                ReferenceCountUtil.release(cast);
+                if (release && msg != null)
+                    ReferenceCountUtil.release(msg);
+                ReferenceCountUtil.release(buf);
             }
         }
         else
         {
-            ctx.fireChannelRead(msg);
-        }
-    }
-
-    protected Object decode(ChannelHandlerContext ctx, ByteBuf msg) throws Exception
-    {
-        boolean release = true;
-        Message result = null;
-        try
-        {
-            result = MessageType.find(msg.readByte()).create();
-            result.decode(msg);
-            release = false;
-            return result;
-        }
-        finally
-        {
-            if (release)
-                ReferenceCountUtil.release(result);
+            return obj;
         }
     }
 

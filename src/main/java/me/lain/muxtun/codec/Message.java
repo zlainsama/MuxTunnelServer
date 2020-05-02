@@ -76,6 +76,8 @@ public interface Message extends MessageAccess
 
     void encode(ByteBuf buf) throws Exception;
 
+    int size();
+
     MessageType type();
 
 }

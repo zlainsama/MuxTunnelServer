@@ -37,7 +37,7 @@ public class MessageJoinSession implements Message, ReferenceCounted
         else
         {
             setId(new UUID(buf.readLong(), buf.readLong()));
-            setBuf(buf.readableBytes() > 0 ? buf.readRetainedSlice(buf.readableBytes()) : null);
+            setBuf(buf.readableBytes() > 0 ? buf.readBytes(buf.readableBytes()) : null);
         }
     }
 
@@ -117,6 +117,12 @@ public class MessageJoinSession implements Message, ReferenceCounted
     {
         this.id = id;
         return this;
+    }
+
+    @Override
+    public int size()
+    {
+        return getId() != null ? 16 + Vars.getSize(getBuf()) : 0;
     }
 
     @Override

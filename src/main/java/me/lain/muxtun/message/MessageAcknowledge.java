@@ -42,7 +42,7 @@ public class MessageAcknowledge implements Message
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        if (getAck() < getSAck())
+        if (getSAck() - getAck() > 0)
         {
             buf.writeInt(getAck());
             buf.writeInt(getSAck());
@@ -77,6 +77,12 @@ public class MessageAcknowledge implements Message
     {
         this.sack = sack;
         return this;
+    }
+
+    @Override
+    public int size()
+    {
+        return getSAck() - getAck() > 0 ? 8 : 4;
     }
 
     @Override

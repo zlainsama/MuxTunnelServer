@@ -34,6 +34,12 @@ public class MessagePing implements Message
     }
 
     @Override
+    public int size()
+    {
+        return 0;
+    }
+
+    @Override
     public MessageType type()
     {
         return MessageType.PING;

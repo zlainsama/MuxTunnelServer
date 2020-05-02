@@ -16,7 +16,6 @@ import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import me.lain.muxtun.Shared;
-import me.lain.muxtun.codec.FrameCodec;
 import me.lain.muxtun.codec.MessageCodec;
 import me.lain.muxtun.util.SimpleLogger;
 
@@ -75,8 +74,7 @@ public class MirrorPoint
                         ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc()));
                         ch.pipeline().addLast(new ChunkedWriteHandler());
                         ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
-                        ch.pipeline().addLast(new FrameCodec());
-                        ch.pipeline().addLast(MessageCodec.DEFAULT);
+                        ch.pipeline().addLast(new MessageCodec());
                         ch.pipeline().addLast(LinkHandler.DEFAULT);
                     }
 

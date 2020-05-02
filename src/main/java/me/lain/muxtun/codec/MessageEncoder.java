@@ -1,60 +1,25 @@
 package me.lain.muxtun.codec;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandlerAdapter;
-import io.netty.channel.ChannelPromise;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.handler.codec.MessageToByteEncoder;
 
-@ChannelHandler.Sharable
-public class MessageEncoder extends ChannelOutboundHandlerAdapter
+public class MessageEncoder extends MessageToByteEncoder<Message>
 {
 
-    public static final MessageEncoder DEFAULT = new MessageEncoder();
-
-    protected Object encode(ChannelHandlerContext ctx, Message msg) throws Exception
+    @Override
+    protected ByteBuf allocateBuffer(ChannelHandlerContext ctx, Message msg, boolean preferDirect) throws Exception
     {
-        boolean release = true;
-        ByteBuf result = null;
-        try
-        {
-            result = ctx.alloc().buffer().writeByte(msg.type().getId());
-            msg.encode(result);
-            release = false;
-            return result;
-        }
-        finally
-        {
-            if (release)
-                ReferenceCountUtil.release(result);
-        }
+        if (preferDirect)
+            return ctx.alloc().ioBuffer(4 + msg.size());
+        else
+            return ctx.alloc().heapBuffer(4 + msg.size());
     }
 
     @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception
+    protected void encode(ChannelHandlerContext ctx, Message msg, ByteBuf out) throws Exception
     {
-        if (msg instanceof Message)
-        {
-            Message cast = (Message) msg;
-
-            try
-            {
-                Object result = encode(ctx, cast);
-                if (result != null)
-                    ctx.write(result, promise);
-                else
-                    throw new Error("BadEncoder");
-            }
-            finally
-            {
-                ReferenceCountUtil.release(cast);
-            }
-        }
-        else
-        {
-            ctx.write(msg, promise);
-        }
+        msg.encode(out.writeMedium(1 + msg.size()).writeByte(msg.type().getId()));
     }
 
 }
