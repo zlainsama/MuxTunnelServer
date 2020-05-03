@@ -23,6 +23,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.flush.FlushConsolidationHandler;
@@ -50,7 +51,6 @@ class LinkSession
     private final Map<Integer, Message> outboundBuffer;
     private final Deque<Message> pendingMessages;
     private final Set<Channel> members;
-    private final ChannelFutureListener remover;
     private final Map<UUID, StreamContext> streams;
     private final Set<UUID> closedStreams;
     private final AtomicInteger timeoutCounter;
@@ -66,8 +66,7 @@ class LinkSession
         this.inboundBuffer = new ConcurrentHashMap<>();
         this.outboundBuffer = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedDeque<>();
-        this.members = Collections.newSetFromMap(new ConcurrentHashMap<Channel, Boolean>());
-        this.remover = future -> drop(future.channel());
+        this.members = new DefaultChannelGroup("SessionMembers", executor);
         this.streams = new ConcurrentHashMap<>();
         this.closedStreams = Collections.newSetFromMap(new ConcurrentHashMap<UUID, Boolean>());
         this.timeoutCounter = new AtomicInteger();
@@ -158,15 +157,7 @@ class LinkSession
 
     boolean drop(Channel channel)
     {
-        if (getMembers().remove(channel))
-        {
-            channel.closeFuture().removeListener(remover);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return getMembers().remove(channel);
     }
 
     void flush()
@@ -464,15 +455,7 @@ class LinkSession
 
     boolean join(Channel channel)
     {
-        if (getMembers().add(channel))
-        {
-            channel.closeFuture().addListener(remover);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return getMembers().add(channel);
     }
 
     PayloadWriter newPayloadWriter(StreamContext context)

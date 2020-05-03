@@ -87,7 +87,7 @@ class LinkContext
     {
         Optional.ofNullable(scheduledMeasurementTimeoutUpdater.getAndSet(initiate ? Vars.TIMER.newTimeout(handle -> getChannel().eventLoop().execute(() -> {
             if (isActive())
-                getRTTM().updateIf(rtt -> rtt >= 1000L).ifPresent(getSRTT()::updateAndGet);
+                getRTTM().updateIf(rtt -> rtt >= 5000L).ifPresent(getSRTT()::updateAndGet);
         }), 5L, TimeUnit.SECONDS) : null)).ifPresent(Timeout::cancel);
     }
 
