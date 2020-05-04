@@ -168,7 +168,7 @@ public class App
                 futures.add(theServer.stop());
                 futures.forEach(Future::syncUninterruptibly);
                 SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
-                SimpleLogger.flush();
+                SimpleLogger.ensureFlushed();
             }
 
         });

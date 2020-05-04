@@ -75,13 +75,19 @@ public final class SimpleLogger
 
     };
 
-    public static void flush()
+    public static void ensureFlushed()
     {
         while (!tasks.isEmpty())
         {
             initiatePrinter();
             forceSleep(50L);
         }
+    }
+
+    public static void execute(Runnable runnable)
+    {
+        tasks.add(runnable);
+        initiatePrinter();
     }
 
     private static void forceSleep(long millis)

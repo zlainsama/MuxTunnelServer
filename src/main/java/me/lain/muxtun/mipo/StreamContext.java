@@ -9,6 +9,9 @@ import io.netty.channel.ChannelFuture;
 class StreamContext
 {
 
+    private static final int INITIAL_QUOTA = 2097152;
+    private static final int QUOTA_THRESHOLD = 1048576;
+
     static StreamContext getContext(Channel channel)
     {
         return channel.attr(Vars.STREAMCONTEXT_KEY).get();
@@ -25,7 +28,7 @@ class StreamContext
         this.streamId = streamId;
         this.session = session;
         this.channel = channel;
-        this.quota = new AtomicInteger(2097152);
+        this.quota = new AtomicInteger(INITIAL_QUOTA);
         this.payloadWriter = session.newPayloadWriter(this);
     }
 
@@ -62,7 +65,10 @@ class StreamContext
     int updateQuota(IntUnaryOperator updateFunction)
     {
         int num = quota.updateAndGet(updateFunction);
-        getChannel().config().setAutoRead(isActive() && getSession().isActive() && getSession().getFlowControl().window() > 0 && num > 0);
+        boolean enabled = getChannel().config().isAutoRead();
+        boolean toogle = enabled ? !(num > 0 && isActive() && getSession().isActive() && getSession().getFlowControl().window() > 0) : (num >= QUOTA_THRESHOLD && isActive() && getSession().isActive() && getSession().getFlowControl().window() > 0);
+        if (toogle)
+            getChannel().config().setAutoRead(!enabled);
         return num;
     }
 

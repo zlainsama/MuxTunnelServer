@@ -63,7 +63,7 @@ public class MirrorPoint
                                 Throwable error = Vars.ChannelError.get(ch);
                                 if (error != null)
                                 {
-                                    error.printStackTrace();
+                                    SimpleLogger.execute(() -> error.printStackTrace());
                                     SimpleLogger.println("%s > [%s] link %s closed with unexpected error. (%s)", Shared.printNow(), config.getName(), ch.id(), error);
                                 }
                             });
