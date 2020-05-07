@@ -1,5 +1,6 @@
 package me.lain.muxtun.util;
 
+import java.util.function.IntBinaryOperator;
 import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
@@ -65,7 +66,7 @@ public class FlowControl
         }
     }
 
-    public int updateReceived(IntStream inbound, IntConsumer issuer, IntConsumer discarder)
+    public int updateReceived(IntStream inbound, IntConsumer issuer, IntConsumer discarder, IntBinaryOperator operator)
     {
         synchronized (remote)
         {
@@ -79,6 +80,10 @@ public class FlowControl
                 else if (expect - i > 0)
                 {
                     discarder.accept(i);
+                }
+                else
+                {
+                    operator.applyAsInt(i, expect);
                 }
 
                 return false;

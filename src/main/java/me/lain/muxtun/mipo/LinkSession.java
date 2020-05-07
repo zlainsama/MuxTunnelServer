@@ -189,6 +189,59 @@ class LinkSession
                         throw new Error("OverlappedSequenceId " + seq);
                     }
 
+                    switch (pending.type())
+                    {
+                        case OPENSTREAM:
+                        case OPENSTREAMUDP:
+                        {
+                            UUID id = pending.getId();
+
+                            if (id != null)
+                            {
+                                StreamContext sctx = getStreams().get(id);
+
+                                if (sctx != null)
+                                {
+                                    if (sctx.first().get() && sctx.first().compareAndSet(true, false))
+                                        sctx.lastSeq().set(seq);
+                                }
+                            }
+
+                            break;
+                        }
+                        case CLOSESTREAM:
+                        case DATASTREAM:
+                        {
+                            UUID id = pending.getId();
+
+                            if (id != null)
+                            {
+                                StreamContext sctx = getStreams().get(id);
+
+                                if (sctx != null)
+                                {
+                                    if (sctx.first().get() && sctx.first().compareAndSet(true, false))
+                                        sctx.lastSeq().set(seq - 1);
+                                    pending.setReq(sctx.lastSeq().getAndSet(seq));
+                                }
+                                else
+                                {
+                                    pending.setReq(seq - 1);
+                                }
+                            }
+                            else
+                            {
+                                pending.setReq(seq - 1);
+                            }
+
+                            break;
+                        }
+                        default:
+                        {
+                            break;
+                        }
+                    }
+
                     getExecutor().execute(new Runnable()
                     {
 
@@ -314,7 +367,7 @@ class LinkSession
 
     private Message handleMessage0(Message msg)
     {
-        if (msg == null)
+        if (msg == null || msg == Vars.PLACEHOLDER)
             return null;
 
         switch (msg.type())
@@ -598,6 +651,38 @@ class LinkSession
             ReferenceCountUtil.release(handleMessage0(getInboundBuffer().remove(seq)));
         }, seq -> {
             ReferenceCountUtil.release(getInboundBuffer().remove(seq));
+        }, (seq, expect) -> {
+            Message msg = getInboundBuffer().get(seq);
+
+            if (msg != null && msg != Vars.PLACEHOLDER)
+            {
+                switch (msg.type())
+                {
+//                  case OPENSTREAM:
+//                  case OPENSTREAMUDP:
+//                  {
+//                      if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
+//                          ReferenceCountUtil.release(handleMessage0(msg));
+//
+//                      break;
+//                  }
+                    case CLOSESTREAM:
+                    case DATASTREAM:
+                    {
+                        if (expect - msg.getReq() > 0 || getInboundBuffer().get(msg.getReq()) == Vars.PLACEHOLDER)
+                            if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
+                                ReferenceCountUtil.release(handleMessage0(msg));
+
+                        break;
+                    }
+                    default:
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return 0;
         }));
     }
 

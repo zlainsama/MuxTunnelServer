@@ -27,6 +27,11 @@ public interface MessageAccess
         throw new UnsupportedOperationException();
     }
 
+    default int getReq()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     default int getSAck()
     {
         throw new UnsupportedOperationException();
@@ -48,6 +53,11 @@ public interface MessageAccess
     }
 
     default Message setId(UUID id)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setReq(int req)
     {
         throw new UnsupportedOperationException();
     }

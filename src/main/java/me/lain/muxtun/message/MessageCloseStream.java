@@ -13,6 +13,7 @@ public class MessageCloseStream implements Message
     }
 
     private int seq;
+    private int req;
     private UUID id;
 
     private MessageCloseStream()
@@ -22,13 +23,14 @@ public class MessageCloseStream implements Message
     @Override
     public Message copy()
     {
-        return type().create().setSeq(getSeq()).setId(getId());
+        return type().create().setSeq(getSeq()).setReq(getReq()).setId(getId());
     }
 
     @Override
     public void decode(ByteBuf buf) throws Exception
     {
         setSeq(buf.readInt());
+        setReq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
     }
 
@@ -36,6 +38,7 @@ public class MessageCloseStream implements Message
     public void encode(ByteBuf buf) throws Exception
     {
         buf.writeInt(getSeq());
+        buf.writeInt(getReq());
         buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
     }
 
@@ -43,6 +46,12 @@ public class MessageCloseStream implements Message
     public UUID getId()
     {
         return id;
+    }
+
+    @Override
+    public int getReq()
+    {
+        return req;
     }
 
     @Override
@@ -59,6 +68,13 @@ public class MessageCloseStream implements Message
     }
 
     @Override
+    public MessageCloseStream setReq(int req)
+    {
+        this.req = req;
+        return this;
+    }
+
+    @Override
     public MessageCloseStream setSeq(int seq)
     {
         this.seq = seq;
@@ -68,7 +84,7 @@ public class MessageCloseStream implements Message
     @Override
     public int size()
     {
-        return 20;
+        return 24;
     }
 
     @Override

@@ -14,6 +14,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     }
 
     private int seq;
+    private int req;
     private UUID id;
     private ByteBuf buf;
 
@@ -24,13 +25,14 @@ public class MessageDataStream implements Message, ReferenceCounted
     @Override
     public Message copy()
     {
-        return type().create().setSeq(getSeq()).setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
+        return type().create().setSeq(getSeq()).setReq(getReq()).setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override
     public void decode(ByteBuf buf) throws Exception
     {
         setSeq(buf.readInt());
+        setReq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
         setBuf(buf.readBytes(buf.readableBytes()));
     }
@@ -39,6 +41,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     public void encode(ByteBuf buf) throws Exception
     {
         buf.writeInt(getSeq());
+        buf.writeInt(getReq());
         buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
         buf.writeBytes(getBuf());
     }
@@ -53,6 +56,12 @@ public class MessageDataStream implements Message, ReferenceCounted
     public UUID getId()
     {
         return id;
+    }
+
+    @Override
+    public int getReq()
+    {
+        return req;
     }
 
     @Override
@@ -116,6 +125,13 @@ public class MessageDataStream implements Message, ReferenceCounted
     }
 
     @Override
+    public MessageDataStream setReq(int req)
+    {
+        this.req = req;
+        return this;
+    }
+
+    @Override
     public MessageDataStream setSeq(int seq)
     {
         this.seq = seq;
@@ -125,7 +141,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     @Override
     public int size()
     {
-        return 20 + Vars.getSize(getBuf());
+        return 24 + Vars.getSize(getBuf());
     }
 
     @Override

@@ -1,6 +1,7 @@
 package me.lain.muxtun.mipo;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntUnaryOperator;
 import io.netty.channel.Channel;
@@ -21,6 +22,8 @@ class StreamContext
     private final LinkSession session;
     private final Channel channel;
     private final AtomicInteger quota;
+    private final AtomicInteger lastSeq;
+    private final AtomicBoolean first;
     private final PayloadWriter payloadWriter;
 
     StreamContext(UUID streamId, LinkSession session, Channel channel)
@@ -29,12 +32,19 @@ class StreamContext
         this.session = session;
         this.channel = channel;
         this.quota = new AtomicInteger(INITIAL_QUOTA);
+        this.lastSeq = new AtomicInteger();
+        this.first = new AtomicBoolean(true);
         this.payloadWriter = session.newPayloadWriter(this);
     }
 
     ChannelFuture close()
     {
         return getChannel().close();
+    }
+
+    AtomicBoolean first()
+    {
+        return first;
     }
 
     Channel getChannel()
@@ -60,6 +70,11 @@ class StreamContext
     boolean isActive()
     {
         return getChannel().isActive();
+    }
+
+    AtomicInteger lastSeq()
+    {
+        return lastSeq;
     }
 
     int updateQuota(IntUnaryOperator updateFunction)
