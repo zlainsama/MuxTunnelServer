@@ -18,7 +18,7 @@ public class FlowControl
 
     public FlowControl()
     {
-        this(1024);
+        this(2048);
     }
 
     public FlowControl(int windowSize)
@@ -41,6 +41,11 @@ public class FlowControl
         }
     }
 
+    public int expect()
+    {
+        return expect;
+    }
+
     public int initialWindowSize()
     {
         return initialWindowSize;
@@ -50,6 +55,16 @@ public class FlowControl
     {
         int diff = seq - expect;
         return diff >= 0 && diff < initialWindowSize;
+    }
+
+    public int lastAck()
+    {
+        return lastAck;
+    }
+
+    public int sequence()
+    {
+        return sequence;
     }
 
     public int tryAdvanceSequence(IntPredicate consumer)

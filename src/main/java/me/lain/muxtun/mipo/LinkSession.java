@@ -221,7 +221,7 @@ class LinkSession
                                 if (sctx != null)
                                 {
                                     if (sctx.first().get() && sctx.first().compareAndSet(true, false))
-                                        sctx.lastSeq().set(seq - 1);
+                                        sctx.lastSeq().set(getFlowControl().lastAck() - 1);
                                     pending.setReq(sctx.lastSeq().getAndSet(seq));
                                 }
                                 else
