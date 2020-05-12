@@ -256,22 +256,15 @@ class LinkSession
 
                                 return true;
                             }
-                            catch (IllegalReferenceCountException e)
+                            catch (IllegalReferenceCountException ignored)
                             {
                                 return false;
                             }
                             catch (Throwable e)
                             {
-                                try
-                                {
-                                    logger.accept(e);
-                                }
-                                finally
-                                {
-                                    ReferenceCountUtil.release(msg);
-                                }
+                                logger.accept(e);
 
-                                return false;
+                                return true;
                             }
                         }
 

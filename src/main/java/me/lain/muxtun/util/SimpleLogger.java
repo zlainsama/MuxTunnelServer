@@ -1,7 +1,7 @@
 package me.lain.muxtun.util;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.io.PrintWriter;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class SimpleLogger
 {
 
-    private static final AtomicReference<Optional<Writer>> fileOut = new AtomicReference<>(Optional.empty());
+    private static final AtomicReference<Optional<PrintWriter>> fileOut = new AtomicReference<>(Optional.empty());
     private static final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
     private static final AtomicBoolean done = new AtomicBoolean(true);
     private static final Runnable printer = new Runnable()
@@ -119,14 +119,14 @@ public final class SimpleLogger
         ForkJoinPool.commonPool().submit(printer);
     }
 
-    private static Optional<Writer> newWriter(Path path)
+    private static Optional<PrintWriter> newWriter(Path path)
     {
         if (path == null)
             return Optional.empty();
 
         try
         {
-            return Optional.of(Channels.newWriter(FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE), StandardCharsets.UTF_8.newEncoder(), -1));
+            return Optional.of(new PrintWriter(Channels.newWriter(FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE), StandardCharsets.UTF_8.newEncoder(), -1), true));
         }
         catch (IOException e)
         {
@@ -138,19 +138,7 @@ public final class SimpleLogger
     {
         tasks.add(() -> {
             System.out.println();
-
-            fileOut.get().ifPresent(w -> {
-                try
-                {
-                    w.write(System.lineSeparator());
-                    w.flush();
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                    setFileOut(null);
-                }
-            });
+            fileOut.get().ifPresent(w -> w.println());
         });
 
         initiatePrinter();
@@ -205,20 +193,7 @@ public final class SimpleLogger
     {
         tasks.add(() -> {
             System.out.println(s);
-
-            fileOut.get().ifPresent(w -> {
-                try
-                {
-                    w.write(s);
-                    w.write(System.lineSeparator());
-                    w.flush();
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                    setFileOut(null);
-                }
-            });
+            fileOut.get().ifPresent(w -> w.println(s));
         });
 
         initiatePrinter();
@@ -231,7 +206,10 @@ public final class SimpleLogger
 
     public static void printStackTrace(Throwable t)
     {
-        tasks.add(t::printStackTrace);
+        tasks.add(() -> {
+            t.printStackTrace();
+            fileOut.get().ifPresent(t::printStackTrace);
+        });
         initiatePrinter();
     }
 
