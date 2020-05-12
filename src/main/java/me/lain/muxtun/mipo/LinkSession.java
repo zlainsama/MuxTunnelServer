@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
@@ -31,12 +32,14 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.IllegalReferenceCountException;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
 import me.lain.muxtun.codec.Message.MessageType;
 import me.lain.muxtun.util.FlowControl;
+import me.lain.muxtun.util.SimpleLogger;
 
 class LinkSession
 {
@@ -245,15 +248,30 @@ class LinkSession
                     getExecutor().execute(new Runnable()
                     {
 
-                        Optional<Message> duplicate(Message msg)
+                        boolean duplicate(Message msg, Consumer<Message> action, Consumer<Throwable> logger)
                         {
                             try
                             {
-                                return Optional.of(msg.copy());
+                                action.accept(msg.copy());
+
+                                return true;
+                            }
+                            catch (IllegalReferenceCountException e)
+                            {
+                                return false;
                             }
                             catch (Throwable e)
                             {
-                                return Optional.empty();
+                                try
+                                {
+                                    logger.accept(e);
+                                }
+                                finally
+                                {
+                                    ReferenceCountUtil.release(msg);
+                                }
+
+                                return false;
                             }
                         }
 
@@ -264,7 +282,7 @@ class LinkSession
 
                             if (msg != null && isActive())
                             {
-                                Optional<Channel> link = getMembers().stream()
+                                Optional<Channel> link = getMembers().stream().sequential()
                                         .filter(channel -> channel.isActive() && channel.isWritable())
                                         .sorted(LinkContext.SORTER)
                                         .filter(channel -> LinkContext.getContext(channel).getTasks().putIfAbsent(seq, this) == null)
@@ -273,8 +291,12 @@ class LinkSession
                                 if (link.isPresent())
                                 {
                                     LinkContext context = LinkContext.getContext(link.get());
-                                    duplicate(msg).ifPresent(context::writeAndFlush);
-                                    Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                    context.getChannel().eventLoop().execute(() -> {
+                                        if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace))
+                                            Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                        else
+                                            getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
+                                    });
                                 }
                                 else
                                 {

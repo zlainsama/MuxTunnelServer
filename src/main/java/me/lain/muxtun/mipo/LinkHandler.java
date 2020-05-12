@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -96,7 +95,10 @@ class LinkHandler extends ChannelDuplexHandler
                                 return value;
                             }) == lctx.getSession())
                             {
-                                lctx.writeAndFlush(MessageType.JOINSESSION.create().setId(id).setBuf(Unpooled.buffer(1).writeBoolean(created[0])));
+                                if (created[0])
+                                    lctx.writeAndFlush(MessageType.JOINSESSION.create().setId(id).setBuf(Vars.TRUE_BUFFER.duplicate()));
+                                else
+                                    lctx.writeAndFlush(MessageType.JOINSESSION.create().setId(id).setBuf(Vars.FALSE_BUFFER.duplicate()));
                             }
                             else
                             {

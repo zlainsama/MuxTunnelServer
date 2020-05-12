@@ -1,6 +1,7 @@
 package me.lain.muxtun.mipo;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.AttributeKey;
@@ -45,6 +46,9 @@ class Vars
         }
 
     }
+
+    static final ByteBuf TRUE_BUFFER = Unpooled.unreleasableBuffer(Unpooled.directBuffer(1, 1).writeBoolean(true).asReadOnly());
+    static final ByteBuf FALSE_BUFFER = Unpooled.unreleasableBuffer(Unpooled.directBuffer(1, 1).writeBoolean(false).asReadOnly());
 
     static final AttributeKey<Throwable> ERROR_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#Error");
     static final AttributeKey<LinkContext> LINKCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#LinkContext");

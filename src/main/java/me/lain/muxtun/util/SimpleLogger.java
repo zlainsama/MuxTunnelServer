@@ -229,6 +229,12 @@ public final class SimpleLogger
         println(Locale.getDefault(), format, args);
     }
 
+    public static void printStackTrace(Throwable t)
+    {
+        tasks.add(t::printStackTrace);
+        initiatePrinter();
+    }
+
     private static void safeClose(AutoCloseable autocloseable)
     {
         try
