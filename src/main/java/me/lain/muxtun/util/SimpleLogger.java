@@ -206,10 +206,7 @@ public final class SimpleLogger
 
     public static void printStackTrace(Throwable t)
     {
-        tasks.add(() -> {
-            t.printStackTrace();
-            fileOut.get().ifPresent(t::printStackTrace);
-        });
+        tasks.add(t::printStackTrace);
         initiatePrinter();
     }
 
