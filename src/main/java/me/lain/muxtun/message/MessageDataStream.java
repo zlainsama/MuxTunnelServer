@@ -34,7 +34,7 @@ public class MessageDataStream implements Message, ReferenceCounted
         setSeq(buf.readInt());
         setReq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
-        setBuf(buf.readRetainedSlice(buf.readableBytes()));
+        setBuf(buf.readBytes(buf.readableBytes()));
     }
 
     @Override

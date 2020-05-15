@@ -2,7 +2,6 @@ package me.lain.muxtun;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -23,11 +22,6 @@ import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.channel.kqueue.KQueue;
-import io.netty.channel.kqueue.KQueueDatagramChannel;
-import io.netty.channel.kqueue.KQueueEventLoopGroup;
-import io.netty.channel.kqueue.KQueueServerSocketChannel;
-import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.ServerSocketChannel;
@@ -51,9 +45,9 @@ public final class Shared
         private static final Map<String, EventExecutorGroup> eventExecutorGroups = new ConcurrentHashMap<>();
         private static final Map<String, EventExecutorGroup> eventExecutorGroupsView = Collections.unmodifiableMap(eventExecutorGroups);
 
-        public static final Class<? extends SocketChannel> classSocketChannel = Epoll.isAvailable() ? EpollSocketChannel.class : KQueue.isAvailable() ? KQueueSocketChannel.class : NioSocketChannel.class;
-        public static final Class<? extends DatagramChannel> classDatagramChannel = Epoll.isAvailable() ? EpollDatagramChannel.class : KQueue.isAvailable() ? KQueueDatagramChannel.class : NioDatagramChannel.class;
-        public static final Class<? extends ServerSocketChannel> classServerSocketChannel = Epoll.isAvailable() ? EpollServerSocketChannel.class : KQueue.isAvailable() ? KQueueServerSocketChannel.class : NioServerSocketChannel.class;
+        public static final Class<? extends SocketChannel> classSocketChannel = Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class;
+        public static final Class<? extends DatagramChannel> classDatagramChannel = Epoll.isAvailable() ? EpollDatagramChannel.class : NioDatagramChannel.class;
+        public static final Class<? extends ServerSocketChannel> classServerSocketChannel = Epoll.isAvailable() ? EpollServerSocketChannel.class : NioServerSocketChannel.class;
 
         public static Map<String, EventExecutorGroup> getEventExecutorGroups()
         {
@@ -88,7 +82,7 @@ public final class Shared
             boolean[] created = new boolean[] { false };
             EventLoopGroup group = eventLoopGroups.computeIfAbsent(name, unused -> {
                 created[0] = true;
-                return Epoll.isAvailable() ? new EpollEventLoopGroup(nThreads, new DefaultThreadFactory(name)) : KQueue.isAvailable() ? new KQueueEventLoopGroup(nThreads, new DefaultThreadFactory(name)) : new NioEventLoopGroup(nThreads, new DefaultThreadFactory(name));
+                return Epoll.isAvailable() ? new EpollEventLoopGroup(nThreads, new DefaultThreadFactory(name)) : new NioEventLoopGroup(nThreads, new DefaultThreadFactory(name));
             });
 
             if (created[0])
@@ -169,7 +163,6 @@ public final class Shared
 
     }
 
-    public static final byte[] magic = "a8a2be845c22bd60f105cd710649bcfabca1dd156f58112fb28dc5f289422a19".getBytes(StandardCharsets.UTF_8);
     public static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public static final OutputStream voidStream = new OutputStream()

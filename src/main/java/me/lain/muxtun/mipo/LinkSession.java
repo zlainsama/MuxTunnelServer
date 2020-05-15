@@ -284,12 +284,15 @@ class LinkSession
                                 if (link.isPresent())
                                 {
                                     LinkContext context = LinkContext.getContext(link.get());
-                                    context.getChannel().eventLoop().execute(() -> {
-                                        if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace))
-                                            Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
-                                        else
-                                            getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
-                                    });
+
+                                    if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace))
+                                    {
+                                        Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                    }
+                                    else
+                                    {
+                                        getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
+                                    }
                                 }
                                 else
                                 {

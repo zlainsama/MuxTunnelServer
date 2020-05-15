@@ -11,7 +11,7 @@ class StreamContext
 {
 
     private static final int INITIAL_QUOTA = 2097152;
-    private static final int QUOTA_THRESHOLD = 1048576;
+    private static final int QUOTA_THRESHOLD = 524288;
 
     static StreamContext getContext(Channel channel)
     {
