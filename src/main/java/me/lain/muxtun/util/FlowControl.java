@@ -18,7 +18,7 @@ public class FlowControl
 
     public FlowControl()
     {
-        this(2048);
+        this(4096);
     }
 
     public FlowControl(int windowSize)

@@ -28,7 +28,6 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.flush.FlushConsolidationHandler;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -576,9 +575,8 @@ class LinkSession
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception
                     {
-                        ch.pipeline().addLast(new ChunkedWriteHandler());
                         ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
-                        ch.pipeline().addLast(TCPStreamHandler.DEFAULT);
+                        ch.pipeline().addLast(TcpStreamHandler.DEFAULT);
                     }
 
                 })
@@ -626,9 +624,8 @@ class LinkSession
                             }
 
                         });
-                        ch.pipeline().addLast(new ChunkedWriteHandler());
                         ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
-                        ch.pipeline().addLast(UDPStreamHandler.DEFAULT);
+                        ch.pipeline().addLast(UdpStreamHandler.DEFAULT);
                     }
 
                 })

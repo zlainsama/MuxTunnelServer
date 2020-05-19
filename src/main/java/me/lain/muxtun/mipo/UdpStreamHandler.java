@@ -1,23 +1,23 @@
 package me.lain.muxtun.mipo;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
 
 @Sharable
-class TCPStreamHandler extends ChannelInboundHandlerAdapter
+class UdpStreamHandler extends ChannelInboundHandlerAdapter
 {
 
-    static final TCPStreamHandler DEFAULT = new TCPStreamHandler();
+    static final UdpStreamHandler DEFAULT = new UdpStreamHandler();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
     {
-        if (msg instanceof ByteBuf)
+        if (msg instanceof DatagramPacket)
         {
-            ByteBuf cast = (ByteBuf) msg;
+            DatagramPacket cast = (DatagramPacket) msg;
 
             try
             {
@@ -42,9 +42,9 @@ class TCPStreamHandler extends ChannelInboundHandlerAdapter
         ctx.close();
     }
 
-    private void handleMessage(StreamContext sctx, ByteBuf msg) throws Exception
+    private void handleMessage(StreamContext sctx, DatagramPacket msg) throws Exception
     {
-        if (sctx.isActive() && !sctx.getPayloadWriter().writeSlices(msg.retain()))
+        if (sctx.isActive() && !sctx.getPayloadWriter().writeSlices(msg.content().retain()))
             sctx.close();
     }
 

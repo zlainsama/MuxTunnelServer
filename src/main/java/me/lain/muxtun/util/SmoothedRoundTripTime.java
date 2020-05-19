@@ -16,7 +16,14 @@ public class SmoothedRoundTripTime
 
     public long get()
     {
-        return SRTT;
+        return Math.max(1L, SRTT);
+    }
+
+    public synchronized void reset()
+    {
+        SRTT = 0L;
+        RTTVAR = 0L;
+        RTO = 0L;
     }
 
     public long rto()
@@ -39,12 +46,12 @@ public class SmoothedRoundTripTime
             RTO = SRTT + Math.max(1000L, Math.round(K * RTTVAR));
         }
 
-        return SRTT;
+        return get();
     }
 
     public long var()
     {
-        return RTTVAR;
+        return Math.max(0L, RTTVAR);
     }
 
 }

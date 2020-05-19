@@ -57,6 +57,7 @@ class LinkHandler extends ChannelDuplexHandler
                 case PING:
                 {
                     lctx.writeAndFlush(MessageType.PING.create());
+                    lctx.getSRTT().reset();
                     break;
                 }
                 case JOINSESSION:
@@ -82,7 +83,7 @@ class LinkHandler extends ChannelDuplexHandler
                                 {
                                     created[0] = true;
 
-                                    if ((value = new LinkSession(key, lctx.getManager(), Vars.WORKERS.next(), challenge.clone())).join(lctx.getChannel()))
+                                    if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone())).join(lctx.getChannel()))
                                     {
                                         lctx.setSession(value);
                                     }
