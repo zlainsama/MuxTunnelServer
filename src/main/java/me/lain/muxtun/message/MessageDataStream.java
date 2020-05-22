@@ -40,10 +40,17 @@ public class MessageDataStream implements Message, ReferenceCounted
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        buf.writeInt(getSeq());
-        buf.writeInt(getReq());
-        buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
-        buf.writeBytes(getBuf());
+        int _seq = getSeq();
+        buf.writeInt(_seq);
+
+        int _req = getReq();
+        buf.writeInt(_req);
+
+        UUID _id = getId();
+        buf.writeLong(_id.getMostSignificantBits()).writeLong(_id.getLeastSignificantBits());
+
+        ByteBuf _buf = getBuf();
+        buf.writeBytes(_buf);
     }
 
     @Override

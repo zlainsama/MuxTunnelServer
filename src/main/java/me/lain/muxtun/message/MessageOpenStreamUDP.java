@@ -35,10 +35,12 @@ public class MessageOpenStreamUDP implements Message
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        buf.writeInt(getSeq());
+        int _seq = getSeq();
+        buf.writeInt(_seq);
 
-        if (getId() != null)
-            buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
+        UUID _id = getId();
+        if (_id != null)
+            buf.writeLong(_id.getMostSignificantBits()).writeLong(_id.getLeastSignificantBits());
     }
 
     @Override

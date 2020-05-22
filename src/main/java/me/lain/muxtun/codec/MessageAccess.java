@@ -27,6 +27,11 @@ public interface MessageAccess
         throw new UnsupportedOperationException();
     }
 
+    default UUID getId2()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     default int getReq()
     {
         throw new UnsupportedOperationException();
@@ -53,6 +58,11 @@ public interface MessageAccess
     }
 
     default Message setId(UUID id)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setId2(UUID id2)
     {
         throw new UnsupportedOperationException();
     }

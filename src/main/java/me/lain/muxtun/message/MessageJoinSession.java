@@ -14,6 +14,7 @@ public class MessageJoinSession implements Message, ReferenceCounted
     }
 
     private UUID id;
+    private UUID id2;
     private ByteBuf buf;
 
     private MessageJoinSession()
@@ -23,7 +24,7 @@ public class MessageJoinSession implements Message, ReferenceCounted
     @Override
     public Message copy()
     {
-        return type().create().setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
+        return type().create().setId(getId()).setId2(getId2()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override
@@ -32,11 +33,19 @@ public class MessageJoinSession implements Message, ReferenceCounted
         if (buf.readableBytes() < 16)
         {
             setId(null);
+            setId2(null);
             setBuf(null);
+        }
+        else if (buf.readableBytes() < 32)
+        {
+            setId(new UUID(buf.readLong(), buf.readLong()));
+            setId2(null);
+            setBuf(buf.readableBytes() > 0 ? buf.readBytes(buf.readableBytes()) : null);
         }
         else
         {
             setId(new UUID(buf.readLong(), buf.readLong()));
+            setId2(new UUID(buf.readLong(), buf.readLong()));
             setBuf(buf.readableBytes() > 0 ? buf.readBytes(buf.readableBytes()) : null);
         }
     }
@@ -44,12 +53,18 @@ public class MessageJoinSession implements Message, ReferenceCounted
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        if (getId() != null)
+        UUID _id = getId();
+        if (_id != null)
         {
-            buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
+            buf.writeLong(_id.getMostSignificantBits()).writeLong(_id.getLeastSignificantBits());
 
-            if (getBuf() != null)
-                buf.writeBytes(getBuf());
+            UUID _id2 = getId2();
+            if (_id2 != null)
+                buf.writeLong(_id2.getMostSignificantBits()).writeLong(_id2.getLeastSignificantBits());
+
+            ByteBuf _buf = getBuf();
+            if (_buf != null)
+                buf.writeBytes(_buf);
         }
     }
 
@@ -63,6 +78,12 @@ public class MessageJoinSession implements Message, ReferenceCounted
     public UUID getId()
     {
         return id;
+    }
+
+    @Override
+    public UUID getId2()
+    {
+        return id2;
     }
 
     @Override
@@ -120,9 +141,16 @@ public class MessageJoinSession implements Message, ReferenceCounted
     }
 
     @Override
+    public MessageJoinSession setId2(UUID id2)
+    {
+        this.id2 = id2;
+        return this;
+    }
+
+    @Override
     public int size()
     {
-        return getId() != null ? 16 + Vars.getSize(getBuf()) : 0;
+        return getId() != null ? 16 + (getId2() != null ? 16 : 0) + Vars.getSize(getBuf()) : 0;
     }
 
     @Override

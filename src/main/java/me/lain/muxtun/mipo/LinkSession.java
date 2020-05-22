@@ -47,6 +47,7 @@ class LinkSession
     private final LinkManager manager;
     private final EventExecutor executor;
     private final byte[] challenge;
+    private final SocketAddress targetAddress;
     private final AtomicBoolean closed;
     private final FlowControl flowControl;
     private final Map<Integer, Message> inboundBuffer;
@@ -57,12 +58,13 @@ class LinkSession
     private final Set<UUID> closedStreams;
     private final AtomicInteger timeoutCounter;
 
-    LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge)
+    LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge, SocketAddress targetAddress)
     {
         this.sessionId = sessionId;
         this.manager = manager;
         this.executor = executor;
         this.challenge = challenge;
+        this.targetAddress = targetAddress;
         this.closed = new AtomicBoolean();
         this.flowControl = new FlowControl();
         this.inboundBuffer = new ConcurrentHashMap<>();
@@ -275,7 +277,7 @@ class LinkSession
                             if (msg != null && isActive())
                             {
                                 Optional<Channel> link = getMembers().stream().sequential()
-                                        .filter(channel -> channel.isActive() && channel.isWritable())
+                                        .filter(channel -> channel.isActive() && channel.isWritable() && LinkContext.getContext(channel).getSession() == LinkSession.this)
                                         .sorted(LinkContext.SORTER)
                                         .filter(channel -> LinkContext.getContext(channel).getTasks().putIfAbsent(seq, this) == null)
                                         .findFirst();
@@ -369,6 +371,11 @@ class LinkSession
         return streams;
     }
 
+    SocketAddress getTargetAddress()
+    {
+        return targetAddress;
+    }
+
     AtomicInteger getTimeoutCounter()
     {
         return timeoutCounter;
@@ -391,75 +398,55 @@ class LinkSession
         {
             case OPENSTREAM:
             {
-                UUID requestId = msg.getId();
-
-                Optional<SocketAddress> address = getManager().getResources().getTargetTableLookup().apply(requestId);
-                if (address.isPresent())
+                openTcpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
                 {
-                    openStream(address.get(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
+
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception
                     {
-
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception
+                        if (future.isSuccess())
                         {
-                            if (future.isSuccess())
-                            {
-                                StreamContext context = StreamContext.getContext(future.channel());
-                                writeAndFlush(MessageType.OPENSTREAM.create().setId(context.getStreamId()));
-                                context.getChannel().closeFuture().addListener(closeFuture -> {
-                                    if (getStreams().remove(context.getStreamId(), context))
-                                        writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
-                                });
-                            }
-                            else
-                            {
-                                writeAndFlush(MessageType.OPENSTREAM.create());
-                            }
+                            StreamContext context = StreamContext.getContext(future.channel());
+                            writeAndFlush(MessageType.OPENSTREAM.create().setId(context.getStreamId()));
+                            context.getChannel().closeFuture().addListener(closeFuture -> {
+                                if (getStreams().remove(context.getStreamId(), context))
+                                    writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
+                            });
                         }
+                        else
+                        {
+                            writeAndFlush(MessageType.OPENSTREAM.create());
+                        }
+                    }
 
-                    });
-                }
-                else
-                {
-                    writeAndFlush(MessageType.OPENSTREAM.create());
-                }
+                });
 
                 break;
             }
             case OPENSTREAMUDP:
             {
-                UUID requestId = msg.getId();
-
-                Optional<SocketAddress> address = getManager().getResources().getTargetTableLookup().apply(requestId);
-                if (address.isPresent())
+                openUdpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
                 {
-                    openStreamUDP(address.get(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
+
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception
                     {
-
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception
+                        if (future.isSuccess())
                         {
-                            if (future.isSuccess())
-                            {
-                                StreamContext context = StreamContext.getContext(future.channel());
-                                writeAndFlush(MessageType.OPENSTREAMUDP.create().setId(context.getStreamId()));
-                                context.getChannel().closeFuture().addListener(closeFuture -> {
-                                    if (getStreams().remove(context.getStreamId(), context))
-                                        writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
-                                });
-                            }
-                            else
-                            {
-                                writeAndFlush(MessageType.OPENSTREAMUDP.create());
-                            }
+                            StreamContext context = StreamContext.getContext(future.channel());
+                            writeAndFlush(MessageType.OPENSTREAMUDP.create().setId(context.getStreamId()));
+                            context.getChannel().closeFuture().addListener(closeFuture -> {
+                                if (getStreams().remove(context.getStreamId(), context))
+                                    writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
+                            });
                         }
+                        else
+                        {
+                            writeAndFlush(MessageType.OPENSTREAMUDP.create());
+                        }
+                    }
 
-                    });
-                }
-                else
-                {
-                    writeAndFlush(MessageType.OPENSTREAMUDP.create());
-                }
+                });
 
                 break;
             }
@@ -564,7 +551,7 @@ class LinkSession
         }
     }
 
-    ChannelFuture openStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
+    ChannelFuture openTcpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
     {
         return new Bootstrap()
                 .group(Vars.WORKERS)
@@ -602,7 +589,7 @@ class LinkSession
                 });
     }
 
-    ChannelFuture openStreamUDP(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
+    ChannelFuture openUdpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
     {
         return new Bootstrap()
                 .group(Vars.WORKERS)
@@ -673,14 +660,14 @@ class LinkSession
             {
                 switch (msg.type())
                 {
-//                  case OPENSTREAM:
-//                  case OPENSTREAMUDP:
-//                  {
-//                      if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
-//                          ReferenceCountUtil.release(handleMessage0(msg));
-//
-//                      break;
-//                  }
+                    case OPENSTREAM:
+                    case OPENSTREAMUDP:
+                    {
+                        if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
+                            ReferenceCountUtil.release(handleMessage0(msg));
+
+                        break;
+                    }
                     case CLOSESTREAM:
                     case DATASTREAM:
                     {

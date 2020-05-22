@@ -37,9 +37,14 @@ public class MessageCloseStream implements Message
     @Override
     public void encode(ByteBuf buf) throws Exception
     {
-        buf.writeInt(getSeq());
-        buf.writeInt(getReq());
-        buf.writeLong(getId().getMostSignificantBits()).writeLong(getId().getLeastSignificantBits());
+        int _seq = getSeq();
+        buf.writeInt(_seq);
+
+        int _req = getReq();
+        buf.writeInt(_req);
+
+        UUID _id = getId();
+        buf.writeLong(_id.getMostSignificantBits()).writeLong(_id.getLeastSignificantBits());
     }
 
     @Override

@@ -1,10 +1,13 @@
 package me.lain.muxtun.mipo;
 
+import java.net.SocketAddress;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -65,6 +68,7 @@ class LinkHandler extends ChannelDuplexHandler
                     if (lctx.getSession() == null)
                     {
                         UUID id = msg.getId();
+                        UUID id2 = msg.getId2();
                         ByteBuf buf = msg.getBuf();
                         byte[] challenge = buf != null ? ByteBufUtil.getBytes(buf, buf.readerIndex(), buf.readableBytes(), false) : null;
 
@@ -81,15 +85,15 @@ class LinkHandler extends ChannelDuplexHandler
                                 }
                                 else
                                 {
-                                    created[0] = true;
+                                    Optional<SocketAddress> address = lctx.getManager().getResources().getTargetTableLookup().apply(id2);
+                                    if (address.isPresent())
+                                    {
+                                        created[0] = true;
 
-                                    if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone())).join(lctx.getChannel()))
-                                    {
-                                        lctx.setSession(value);
-                                    }
-                                    else
-                                    {
-                                        lctx.close();
+                                        if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone(), address.get())).join(lctx.getChannel()))
+                                        {
+                                            lctx.setSession(value);
+                                        }
                                     }
                                 }
 
@@ -103,7 +107,7 @@ class LinkHandler extends ChannelDuplexHandler
                             }
                             else
                             {
-                                lctx.writeAndFlush(MessageType.JOINSESSION.create());
+                                lctx.writeAndFlush(MessageType.JOINSESSION.create()).addListener(ChannelFutureListener.CLOSE);
                             }
                         }
                         else

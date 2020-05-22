@@ -44,12 +44,16 @@ public class MessageAcknowledge implements Message
     {
         if (getSAck() - getAck() > 0)
         {
-            buf.writeInt(getAck());
-            buf.writeInt(getSAck());
+            int _ack = getAck();
+            buf.writeInt(_ack);
+
+            int _sack = getSAck();
+            buf.writeInt(_sack);
         }
         else
         {
-            buf.writeInt(getAck());
+            int _ack = getAck();
+            buf.writeInt(_ack);
         }
     }
 
