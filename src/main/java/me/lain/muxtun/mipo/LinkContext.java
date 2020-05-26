@@ -17,7 +17,7 @@ class LinkContext
 
     static final Comparator<Channel> SORTER = Comparator.comparingLong(channel -> {
         LinkContext context = LinkContext.getContext(channel);
-        return context.getSRTT().get() * (1 + context.getTasks().size());
+        return context.getSRTT().get() + context.getSRTT().var() * (1 + context.getTasks().size());
     });
 
     static LinkContext getContext(Channel channel)
