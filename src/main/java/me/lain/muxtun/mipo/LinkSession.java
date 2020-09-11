@@ -638,6 +638,33 @@ class LinkSession
                 });
     }
 
+    void tick()
+    {
+        if (isActive())
+        {
+            if (getExecutor().inEventLoop())
+                tick0();
+            else
+                getExecutor().execute(() -> tick0());
+        }
+    }
+
+    private void tick0()
+    {
+        Set<Channel> members = getMembers();
+
+        if (members.isEmpty())
+        {
+            if (getTimeoutCounter().incrementAndGet() > 30)
+                close();
+        }
+        else
+        {
+            getTimeoutCounter().set(0);
+            members.stream().map(LinkContext::getContext).forEach(LinkContext::tick);
+        }
+    }
+
     void updateReceived(IntConsumer acknowledger)
     {
         if (!isActive())
