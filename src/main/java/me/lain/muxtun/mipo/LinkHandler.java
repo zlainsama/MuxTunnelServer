@@ -90,7 +90,7 @@ class LinkHandler extends ChannelDuplexHandler
                                     {
                                         created[0] = true;
 
-                                        if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone(), address.get())).join(lctx.getChannel()))
+                                        if ((value = new LinkSession(key, lctx.getManager(), Vars.WORKERS.next(), challenge.clone(), address.get())).join(lctx.getChannel()))
                                         {
                                             lctx.setSession(value);
                                         }

@@ -290,7 +290,7 @@ class LinkSession
 
                                     if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace))
                                     {
-                                        Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), lastRTO = context.getSRTT().rto(), TimeUnit.MILLISECONDS);
+                                        getExecutor().schedule(this, lastRTO = context.getSRTT().rto(), TimeUnit.MILLISECONDS);
                                     }
                                     else
                                     {
@@ -299,7 +299,7 @@ class LinkSession
                                 }
                                 else
                                 {
-                                    Vars.TIMER.newTimeout(handle -> getExecutor().execute(this), lastRTO, TimeUnit.MILLISECONDS);
+                                    getExecutor().schedule(this, lastRTO, TimeUnit.MILLISECONDS);
                                 }
                             }
                             else
@@ -458,7 +458,7 @@ class LinkSession
 
                 if (getClosedStreams().add(streamId))
                 {
-                    Vars.TIMER.newTimeout(handle -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
+                    getExecutor().schedule(() -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
                 }
 
                 StreamContext context = getStreams().remove(streamId);
@@ -747,7 +747,7 @@ class LinkSession
 
                     if (getClosedStreams().add(streamId))
                     {
-                        Vars.TIMER.newTimeout(handle -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
+                        getExecutor().schedule(() -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
                         getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
                     }
