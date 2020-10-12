@@ -1,26 +1,21 @@
 package me.lain.muxtun.mipo;
 
-import java.util.Comparator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.concurrent.EventExecutor;
 import me.lain.muxtun.util.RoundTripTimeMeasurement;
 import me.lain.muxtun.util.SmoothedRoundTripTime;
 
-class LinkContext
-{
+import java.util.Comparator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+class LinkContext {
 
     static final Comparator<Channel> SORTER = Comparator.comparingLong(channel -> {
         LinkContext context = LinkContext.getContext(channel);
-        return context.getSRTT().get() + context.getSRTT().var() * (1 + 2 * context.getTasks().size());
+        return context.getSRTT().csf(context.getTasks().size());
     });
-
-    static LinkContext getContext(Channel channel)
-    {
-        return channel.attr(Vars.LINKCONTEXT_KEY).get();
-    }
 
     private final LinkManager manager;
     private final Channel channel;
@@ -28,10 +23,10 @@ class LinkContext
     private final RoundTripTimeMeasurement RTTM;
     private final SmoothedRoundTripTime SRTT;
     private final Map<Integer, Runnable> tasks;
+
     private volatile LinkSession session;
 
-    LinkContext(LinkManager manager, Channel channel)
-    {
+    LinkContext(LinkManager manager, Channel channel) {
         this.manager = manager;
         this.channel = channel;
         this.executor = channel.eventLoop();
@@ -40,61 +35,53 @@ class LinkContext
         this.tasks = new ConcurrentHashMap<>();
     }
 
-    ChannelFuture close()
-    {
+    static LinkContext getContext(Channel channel) {
+        return channel.attr(Vars.LINKCONTEXT_KEY).get();
+    }
+
+    ChannelFuture close() {
         return channel.close();
     }
 
-    Channel getChannel()
-    {
+    Channel getChannel() {
         return channel;
     }
 
-    EventExecutor getExecutor()
-    {
+    EventExecutor getExecutor() {
         return executor;
     }
 
-    LinkManager getManager()
-    {
+    LinkManager getManager() {
         return manager;
     }
 
-    RoundTripTimeMeasurement getRTTM()
-    {
+    RoundTripTimeMeasurement getRTTM() {
         return RTTM;
     }
 
-    LinkSession getSession()
-    {
+    LinkSession getSession() {
         return session;
     }
 
-    SmoothedRoundTripTime getSRTT()
-    {
-        return SRTT;
-    }
-
-    Map<Integer, Runnable> getTasks()
-    {
-        return tasks;
-    }
-
-    boolean isActive()
-    {
-        return channel.isActive();
-    }
-
-    LinkContext setSession(LinkSession session)
-    {
+    LinkContext setSession(LinkSession session) {
         this.session = session;
         return this;
     }
 
-    void tick()
-    {
-        if (isActive())
-        {
+    SmoothedRoundTripTime getSRTT() {
+        return SRTT;
+    }
+
+    Map<Integer, Runnable> getTasks() {
+        return tasks;
+    }
+
+    boolean isActive() {
+        return channel.isActive();
+    }
+
+    void tick() {
+        if (isActive()) {
             if (getExecutor().inEventLoop())
                 tick0();
             else
@@ -102,13 +89,11 @@ class LinkContext
         }
     }
 
-    private void tick0()
-    {
+    private void tick0() {
         getRTTM().updateIf(rtt -> rtt >= 2000L).ifPresent(getSRTT()::updateAndGet);
     }
 
-    ChannelFuture writeAndFlush(Object msg)
-    {
+    ChannelFuture writeAndFlush(Object msg) {
         return channel.writeAndFlush(msg);
     }
 

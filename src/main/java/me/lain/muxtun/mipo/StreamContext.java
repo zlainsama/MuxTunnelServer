@@ -1,22 +1,17 @@
 package me.lain.muxtun.mipo;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntUnaryOperator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 
-class StreamContext
-{
+class StreamContext {
 
     private static final int INITIAL_QUOTA = 2097152;
     private static final int QUOTA_THRESHOLD = 524288;
-
-    static StreamContext getContext(Channel channel)
-    {
-        return channel.attr(Vars.STREAMCONTEXT_KEY).get();
-    }
 
     private final UUID streamId;
     private final LinkSession session;
@@ -26,8 +21,7 @@ class StreamContext
     private final AtomicBoolean first;
     private final PayloadWriter payloadWriter;
 
-    StreamContext(UUID streamId, LinkSession session, Channel channel)
-    {
+    StreamContext(UUID streamId, LinkSession session, Channel channel) {
         this.streamId = streamId;
         this.session = session;
         this.channel = channel;
@@ -37,48 +31,43 @@ class StreamContext
         this.payloadWriter = session.newPayloadWriter(this);
     }
 
-    ChannelFuture close()
-    {
+    static StreamContext getContext(Channel channel) {
+        return channel.attr(Vars.STREAMCONTEXT_KEY).get();
+    }
+
+    ChannelFuture close() {
         return getChannel().close();
     }
 
-    AtomicBoolean first()
-    {
+    AtomicBoolean first() {
         return first;
     }
 
-    Channel getChannel()
-    {
+    Channel getChannel() {
         return channel;
     }
 
-    PayloadWriter getPayloadWriter()
-    {
+    PayloadWriter getPayloadWriter() {
         return payloadWriter;
     }
 
-    LinkSession getSession()
-    {
+    LinkSession getSession() {
         return session;
     }
 
-    UUID getStreamId()
-    {
+    UUID getStreamId() {
         return streamId;
     }
 
-    boolean isActive()
-    {
+    boolean isActive() {
         return getChannel().isActive();
     }
 
-    AtomicInteger lastSeq()
-    {
+    AtomicInteger lastSeq() {
         return lastSeq;
     }
 
-    int updateQuota(IntUnaryOperator updateFunction)
-    {
+    int updateQuota(IntUnaryOperator updateFunction) {
         int num = quota.updateAndGet(updateFunction);
         boolean enabled = getChannel().config().isAutoRead();
         boolean toogle = enabled ? !(num > 0 && isActive() && getSession().isActive() && getSession().getFlowControl().window() > 0) : (num >= QUOTA_THRESHOLD && isActive() && getSession().isActive() && getSession().getFlowControl().window() > 0);
@@ -87,8 +76,7 @@ class StreamContext
         return num;
     }
 
-    ChannelFuture writeAndFlush(Object msg)
-    {
+    ChannelFuture writeAndFlush(Object msg) {
         return getChannel().writeAndFlush(msg);
     }
 

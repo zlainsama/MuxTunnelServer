@@ -1,36 +1,32 @@
 package me.lain.muxtun.message;
 
-import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCounted;
 import me.lain.muxtun.codec.Message;
 
-public class MessageDataStream implements Message, ReferenceCounted
-{
+import java.util.UUID;
 
-    public static MessageDataStream create()
-    {
-        return new MessageDataStream();
-    }
+public class MessageDataStream implements Message, ReferenceCounted {
 
     private int seq;
     private int req;
     private UUID id;
     private ByteBuf buf;
 
-    private MessageDataStream()
-    {
+    private MessageDataStream() {
+    }
+
+    public static MessageDataStream create() {
+        return new MessageDataStream();
     }
 
     @Override
-    public Message copy()
-    {
+    public Message copy() {
         return type().create().setSeq(getSeq()).setReq(getReq()).setId(getId()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override
-    public void decode(ByteBuf buf) throws Exception
-    {
+    public void decode(ByteBuf buf) throws Exception {
         setSeq(buf.readInt());
         setReq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
@@ -38,8 +34,7 @@ public class MessageDataStream implements Message, ReferenceCounted
     }
 
     @Override
-    public void encode(ByteBuf buf) throws Exception
-    {
+    public void encode(ByteBuf buf) throws Exception {
         int _seq = getSeq();
         buf.writeInt(_seq);
 
@@ -54,122 +49,105 @@ public class MessageDataStream implements Message, ReferenceCounted
     }
 
     @Override
-    public ByteBuf getBuf()
-    {
+    public ByteBuf getBuf() {
         return buf;
     }
 
     @Override
-    public UUID getId()
-    {
+    public MessageDataStream setBuf(ByteBuf buf) {
+        this.buf = buf;
+        return this;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 
     @Override
-    public int getReq()
-    {
+    public MessageDataStream setId(UUID id) {
+        this.id = id;
+        return this;
+    }
+
+    @Override
+    public int getReq() {
         return req;
     }
 
     @Override
-    public int getSeq()
-    {
+    public MessageDataStream setReq(int req) {
+        this.req = req;
+        return this;
+    }
+
+    @Override
+    public int getSeq() {
         return seq;
     }
 
     @Override
-    public int refCnt()
-    {
+    public MessageDataStream setSeq(int seq) {
+        this.seq = seq;
+        return this;
+    }
+
+    @Override
+    public int refCnt() {
         if (buf != null)
             return buf.refCnt();
         return 0;
     }
 
     @Override
-    public boolean release()
-    {
+    public boolean release() {
         if (buf != null)
             return buf.release();
         return false;
     }
 
     @Override
-    public boolean release(int decrement)
-    {
+    public boolean release(int decrement) {
         if (buf != null)
             return buf.release(decrement);
         return false;
     }
 
     @Override
-    public MessageDataStream retain()
-    {
+    public MessageDataStream retain() {
         if (buf != null)
             buf.retain();
         return this;
     }
 
     @Override
-    public MessageDataStream retain(int increment)
-    {
+    public MessageDataStream retain(int increment) {
         if (buf != null)
             buf.retain(increment);
         return this;
     }
 
     @Override
-    public MessageDataStream setBuf(ByteBuf buf)
-    {
-        this.buf = buf;
-        return this;
-    }
-
-    @Override
-    public MessageDataStream setId(UUID id)
-    {
-        this.id = id;
-        return this;
-    }
-
-    @Override
-    public MessageDataStream setReq(int req)
-    {
-        this.req = req;
-        return this;
-    }
-
-    @Override
-    public MessageDataStream setSeq(int seq)
-    {
-        this.seq = seq;
-        return this;
-    }
-
-    @Override
-    public int size()
-    {
+    public int size() {
         return 24 + Vars.getSize(getBuf());
     }
 
     @Override
-    public MessageDataStream touch()
-    {
+    public MessageDataStream touch() {
         if (buf != null)
             buf.touch();
         return this;
     }
 
     @Override
-    public MessageDataStream touch(Object hint)
-    {
+    public MessageDataStream touch(Object hint) {
         if (buf != null)
             buf.touch(hint);
         return this;
     }
 
     @Override
-    public MessageType type()
-    {
+    public MessageType type() {
         return MessageType.DATASTREAM;
     }
 

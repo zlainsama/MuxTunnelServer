@@ -1,5 +1,13 @@
 package me.lain.muxtun.mipo;
 
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.handler.ssl.util.FingerprintTrustManagerFactory;
+import me.lain.muxtun.Shared;
+
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.file.Files;
@@ -8,39 +16,19 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import javax.net.ssl.SSLException;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
-import io.netty.handler.ssl.util.FingerprintTrustManagerFactory;
-import me.lain.muxtun.Shared;
 
-public class MirrorPointConfig
-{
-
-    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha1, List<String> ciphers, List<String> protocols) throws SSLException, IOException
-    {
-        return SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ))
-                .clientAuth(ClientAuth.REQUIRE)
-                .trustManager(new FingerprintTrustManagerFactory(trustSha1))
-                .ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE)
-                .protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null)
-                .build();
-    }
+public class MirrorPointConfig {
 
     private final SocketAddress bindAddress;
     private final Map<UUID, SocketAddress> targetAddresses;
     private final SslContext sslCtx;
     private final String name;
 
-    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx)
-    {
+    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx) {
         this(bindAddress, targetAddresses, sslCtx, "MirrorPoint");
     }
 
-    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx, String name)
-    {
+    public MirrorPointConfig(SocketAddress bindAddress, Map<UUID, SocketAddress> targetAddresses, SslContext sslCtx, String name) {
         if (bindAddress == null || targetAddresses == null || sslCtx == null || name == null)
             throw new NullPointerException();
         if (targetAddresses.isEmpty() || !sslCtx.isServer() || name.isEmpty())
@@ -52,23 +40,28 @@ public class MirrorPointConfig
         this.name = name;
     }
 
-    public SocketAddress getBindAddress()
-    {
+    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha1, List<String> ciphers, List<String> protocols) throws SSLException, IOException {
+        return SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ))
+                .clientAuth(ClientAuth.REQUIRE)
+                .trustManager(new FingerprintTrustManagerFactory(trustSha1))
+                .ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE)
+                .protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null)
+                .build();
+    }
+
+    public SocketAddress getBindAddress() {
         return bindAddress;
     }
 
-    public String getName()
-    {
+    public String getName() {
         return name;
     }
 
-    public SslContext getSslCtx()
-    {
+    public SslContext getSslCtx() {
         return sslCtx;
     }
 
-    public Map<UUID, SocketAddress> getTargetAddresses()
-    {
+    public Map<UUID, SocketAddress> getTargetAddresses() {
         return targetAddresses;
     }
 

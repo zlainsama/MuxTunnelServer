@@ -3,45 +3,37 @@ package me.lain.muxtun.message;
 import io.netty.buffer.ByteBuf;
 import me.lain.muxtun.codec.Message;
 
-public class MessagePing implements Message
-{
+public class MessagePing implements Message {
 
-    private static MessagePing INSTANCE = new MessagePing();
+    private static final MessagePing INSTANCE = new MessagePing();
 
-    public static MessagePing create()
-    {
+    private MessagePing() {
+    }
+
+    public static MessagePing create() {
         return INSTANCE;
     }
 
-    private MessagePing()
-    {
-    }
-
     @Override
-    public Message copy()
-    {
+    public Message copy() {
         return type().create();
     }
 
     @Override
-    public void decode(ByteBuf buf) throws Exception
-    {
+    public void decode(ByteBuf buf) throws Exception {
     }
 
     @Override
-    public void encode(ByteBuf buf) throws Exception
-    {
+    public void encode(ByteBuf buf) throws Exception {
     }
 
     @Override
-    public int size()
-    {
+    public int size() {
         return 0;
     }
 
     @Override
-    public MessageType type()
-    {
+    public MessageType type() {
         return MessageType.PING;
     }
 

@@ -9,228 +9,151 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool.ManagedBlocker;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
-public final class SimpleLogger
-{
+public final class SimpleLogger {
 
+    private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(SimpleLogger::newWorkerThread);
     private static final AtomicReference<Optional<PrintWriter>> fileOut = new AtomicReference<>(Optional.empty());
-    private static final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
-    private static final AtomicBoolean done = new AtomicBoolean(true);
-    private static final Runnable printer = new Runnable()
-    {
 
-        ManagedBlocker blocker = new ManagedBlocker()
-        {
-
-            @Override
-            public boolean block() throws InterruptedException
-            {
-                Runnable task;
-                while ((task = tasks.poll(50L, TimeUnit.MILLISECONDS)) != null)
-                {
-                    try
-                    {
-                        task.run();
-                    }
-                    catch (Throwable e)
-                    {
-                    }
-                }
-                return true;
-            }
-
-            @Override
-            public boolean isReleasable()
-            {
-                return tasks.isEmpty();
-            }
-
-        };
-
-        @Override
-        public void run()
-        {
-            while (!tasks.isEmpty() && done.compareAndSet(true, false))
-            {
-                try
-                {
-                    ForkJoinPool.managedBlock(blocker);
-                }
-                catch (InterruptedException e)
-                {
-                }
-                finally
-                {
-                    done.set(true);
-                }
-            }
-        }
-
-    };
-
-    public static void ensureFlushed()
-    {
-        while (!tasks.isEmpty())
-        {
-            initiatePrinter();
-            forceSleep(50L);
-        }
+    private SimpleLogger() {
+        throw new IllegalStateException("NoInstance");
     }
 
-    public static void execute(Runnable runnable)
-    {
-        tasks.add(runnable);
-        initiatePrinter();
+    public static void execute(Runnable command) {
+        WORKER.execute(command);
     }
 
-    private static void forceSleep(long millis)
-    {
-        long start = System.currentTimeMillis();
-
-        for (;;)
-        {
-            long elapsed = System.currentTimeMillis() - start;
-
-            if (elapsed >= millis)
-                break;
-
-            try
-            {
-                Thread.sleep(millis - elapsed);
-            }
-            catch (InterruptedException e)
-            {
-            }
-        }
-    }
-
-    private static void initiatePrinter()
-    {
-        if (tasks.isEmpty() || !done.get())
-            return;
-
-        ForkJoinPool.commonPool().submit(printer);
-    }
-
-    private static Optional<PrintWriter> newWriter(Path path)
-    {
+    private static PrintWriter newPrintWriter(Path path) {
         if (path == null)
-            return Optional.empty();
+            return null;
 
-        try
-        {
-            return Optional.of(new PrintWriter(Channels.newWriter(FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE), StandardCharsets.UTF_8.newEncoder(), -1), true));
-        }
-        catch (IOException e)
-        {
-            return Optional.empty();
+        try {
+            return new PrintWriter(Channels.newWriter(FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE), StandardCharsets.UTF_8.newEncoder(), -1), true);
+        } catch (IOException e) {
+            return null;
         }
     }
 
-    public static void println()
-    {
-        tasks.add(() -> {
+    private static Thread newWorkerThread(Runnable r) {
+        Thread t = new Thread(r, "SimpleLogger.WORKER");
+        if (!t.isDaemon())
+            t.setDaemon(true);
+        if (t.getPriority() != Thread.NORM_PRIORITY)
+            t.setPriority(Thread.NORM_PRIORITY);
+        return t;
+    }
+
+    public static void print(boolean b) {
+        print(String.valueOf(b));
+    }
+
+    public static void print(char c) {
+        print(String.valueOf(c));
+    }
+
+    public static void print(char[] s) {
+        print(String.valueOf(s));
+    }
+
+    public static void print(double d) {
+        print(String.valueOf(d));
+    }
+
+    public static void print(float f) {
+        print(String.valueOf(f));
+    }
+
+    public static void print(int i) {
+        print(String.valueOf(i));
+    }
+
+    public static void print(Locale l, String format, Object... args) {
+        print(String.format(l, format, args));
+    }
+
+    public static void print(long l) {
+        print(String.valueOf(l));
+    }
+
+    public static void print(Object obj) {
+        print(String.valueOf(obj));
+    }
+
+    public static void print(String s) {
+        execute(() -> {
+            System.out.print(s);
+            fileOut.get().ifPresent(w -> w.print(s));
+        });
+    }
+
+    public static void print(String format, Object... args) {
+        print(String.format(Locale.getDefault(), format, args));
+    }
+
+    public static void println() {
+        execute(() -> {
             System.out.println();
             fileOut.get().ifPresent(w -> w.println());
         });
-
-        initiatePrinter();
     }
 
-    public static void println(boolean b)
-    {
+    public static void println(boolean b) {
         println(String.valueOf(b));
     }
 
-    public static void println(char c)
-    {
+    public static void println(char c) {
         println(String.valueOf(c));
     }
 
-    public static void println(char[] s)
-    {
+    public static void println(char[] s) {
         println(String.valueOf(s));
     }
 
-    public static void println(double d)
-    {
+    public static void println(double d) {
         println(String.valueOf(d));
     }
 
-    public static void println(float f)
-    {
+    public static void println(float f) {
         println(String.valueOf(f));
     }
 
-    public static void println(int i)
-    {
+    public static void println(int i) {
         println(String.valueOf(i));
     }
 
-    public static void println(Locale l, String format, Object... args)
-    {
+    public static void println(Locale l, String format, Object... args) {
         println(String.format(l, format, args));
     }
 
-    public static void println(long l)
-    {
+    public static void println(long l) {
         println(String.valueOf(l));
     }
 
-    public static void println(Object obj)
-    {
+    public static void println(Object obj) {
         println(String.valueOf(obj));
     }
 
-    public static void println(String s)
-    {
-        tasks.add(() -> {
+    public static void println(String s) {
+        execute(() -> {
             System.out.println(s);
             fileOut.get().ifPresent(w -> w.println(s));
         });
-
-        initiatePrinter();
     }
 
-    public static void println(String format, Object... args)
-    {
-        println(Locale.getDefault(), format, args);
+    public static void println(String format, Object... args) {
+        println(String.format(Locale.getDefault(), format, args));
     }
 
-    public static void printStackTrace(Throwable t)
-    {
-        tasks.add(t::printStackTrace);
-        initiatePrinter();
+    public static void printStackTrace(Throwable t) {
+        execute(t::printStackTrace);
     }
 
-    private static void safeClose(AutoCloseable autocloseable)
-    {
-        try
-        {
-            if (autocloseable != null)
-                autocloseable.close();
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-    }
-
-    public static boolean setFileOut(Path path)
-    {
-        fileOut.getAndSet(newWriter(path)).ifPresent(SimpleLogger::safeClose);
+    public static boolean setFileOut(Path path) {
+        fileOut.getAndSet(Optional.ofNullable(newPrintWriter(path))).ifPresent(PrintWriter::close);
         return fileOut.get().isPresent() || path == null;
-    }
-
-    private SimpleLogger()
-    {
     }
 
 }

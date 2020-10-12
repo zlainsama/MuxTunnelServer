@@ -5,34 +5,30 @@ import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
-public class FlowControl
-{
+public class FlowControl {
 
     private final Object local;
     private final Object remote;
     private final int initialWindowSize;
+
     private volatile int window;
     private volatile int sequence;
     private volatile int lastAck;
     private volatile int expect;
 
-    public FlowControl()
-    {
+    public FlowControl() {
         this(4096);
     }
 
-    public FlowControl(int windowSize)
-    {
+    public FlowControl(int windowSize) {
         local = new Object();
         remote = new Object();
         initialWindowSize = windowSize;
         window = windowSize;
     }
 
-    public int acknowledge(IntStream outbound, IntConsumer remover, int ack, int sack)
-    {
-        synchronized (local)
-        {
+    public int acknowledge(IntStream outbound, IntConsumer remover, int ack, int sack) {
+        synchronized (local) {
             int inc = Math.max(0, ack - lastAck);
             lastAck += inc;
             int sackDiff = sack - ack;
@@ -41,38 +37,30 @@ public class FlowControl
         }
     }
 
-    public int expect()
-    {
+    public int expect() {
         return expect;
     }
 
-    public int initialWindowSize()
-    {
+    public int initialWindowSize() {
         return initialWindowSize;
     }
 
-    public boolean inRange(int seq)
-    {
+    public boolean inRange(int seq) {
         int diff = seq - expect;
         return diff >= 0 && diff < initialWindowSize;
     }
 
-    public int lastAck()
-    {
+    public int lastAck() {
         return lastAck;
     }
 
-    public int sequence()
-    {
+    public int sequence() {
         return sequence;
     }
 
-    public int tryAdvanceSequence(IntPredicate consumer)
-    {
-        synchronized (local)
-        {
-            if (window > 0 && consumer.test(sequence))
-            {
+    public int tryAdvanceSequence(IntPredicate consumer) {
+        synchronized (local) {
+            if (window > 0 && consumer.test(sequence)) {
                 window -= 1;
                 sequence += 1;
             }
@@ -81,23 +69,16 @@ public class FlowControl
         }
     }
 
-    public int updateReceived(IntStream inbound, IntConsumer issuer, IntConsumer discarder, IntBinaryOperator operator)
-    {
-        synchronized (remote)
-        {
+    public int updateReceived(IntStream inbound, IntConsumer issuer, IntConsumer discarder, IntBinaryOperator operator) {
+        synchronized (remote) {
             int base = expect;
             inbound.map(i -> i - base).sorted().map(i -> base + i).sequential().filter(i -> {
-                if (i == expect)
-                {
+                if (i == expect) {
                     expect += 1;
                     return true;
-                }
-                else if (expect - i > 0)
-                {
+                } else if (expect - i > 0) {
                     discarder.accept(i);
-                }
-                else
-                {
+                } else {
                     operator.applyAsInt(i, expect);
                 }
 
@@ -108,8 +89,7 @@ public class FlowControl
         }
     }
 
-    public int window()
-    {
+    public int window() {
         return window;
     }
 

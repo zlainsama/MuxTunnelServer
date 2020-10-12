@@ -1,32 +1,27 @@
 package me.lain.muxtun.codec;
 
+import io.netty.buffer.ByteBuf;
+import me.lain.muxtun.message.*;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import io.netty.buffer.ByteBuf;
-import me.lain.muxtun.message.MessageAcknowledge;
-import me.lain.muxtun.message.MessageCloseStream;
-import me.lain.muxtun.message.MessageDataStream;
-import me.lain.muxtun.message.MessageJoinSession;
-import me.lain.muxtun.message.MessageOpenStream;
-import me.lain.muxtun.message.MessageOpenStreamUDP;
-import me.lain.muxtun.message.MessagePing;
 
-public interface Message extends MessageAccess
-{
+public interface Message extends MessageAccess {
 
-    @FunctionalInterface
-    interface MessageFactory
-    {
+    Message copy();
 
-        Message create();
+    void decode(ByteBuf buf) throws Exception;
 
-    }
+    void encode(ByteBuf buf) throws Exception;
 
-    enum MessageType
-    {
+    int size();
+
+    MessageType type();
+
+    enum MessageType {
 
         PING(0x00, MessagePing::create),
         JOINSESSION(0x20, MessageJoinSession::create),
@@ -38,46 +33,37 @@ public interface Message extends MessageAccess
         UNKNOWN(0xFF, MessageType::createUnknown);
 
         private static final Map<Byte, MessageType> idMap = Collections.unmodifiableMap(Arrays.stream(values()).collect(Collectors.toMap(MessageType::getId, Function.identity())));
-
-        private static Message createUnknown()
-        {
-            throw new UnsupportedOperationException("UnknownMessageType");
-        }
-
-        public static MessageType find(byte id)
-        {
-            return idMap.getOrDefault(id, UNKNOWN);
-        }
-
         private final byte id;
         private final MessageFactory factory;
 
-        private MessageType(int id, MessageFactory factory)
-        {
+        private MessageType(int id, MessageFactory factory) {
             this.id = (byte) id;
             this.factory = factory;
         }
 
-        public Message create()
-        {
+        private static Message createUnknown() {
+            throw new UnsupportedOperationException("UnknownMessageType");
+        }
+
+        public static MessageType find(byte id) {
+            return idMap.getOrDefault(id, UNKNOWN);
+        }
+
+        public Message create() {
             return factory.create();
         }
 
-        public byte getId()
-        {
+        public byte getId() {
             return id;
         }
 
     }
 
-    Message copy();
+    @FunctionalInterface
+    interface MessageFactory {
 
-    void decode(ByteBuf buf) throws Exception;
+        Message create();
 
-    void encode(ByteBuf buf) throws Exception;
-
-    int size();
-
-    MessageType type();
+    }
 
 }

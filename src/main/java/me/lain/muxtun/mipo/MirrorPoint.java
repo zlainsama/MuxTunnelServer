@@ -1,8 +1,5 @@
 package me.lain.muxtun.mipo;
 
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -16,18 +13,19 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.MessageCodec;
-import me.lain.muxtun.util.SimpleLogger;
 
-public class MirrorPoint
-{
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+public class MirrorPoint {
 
     private final MirrorPointConfig config;
     private final ChannelGroup channels;
     private final LinkManager manager;
     private final AtomicReference<Future<?>> scheduledMaintainTask;
 
-    public MirrorPoint(MirrorPointConfig config)
-    {
+    public MirrorPoint(MirrorPointConfig config) {
         this.config = config;
         this.channels = new DefaultChannelGroup("MirrorPoint", GlobalEventExecutor.INSTANCE, true);
         this.manager = new LinkManager(new SharedResources(future -> {
@@ -39,34 +37,20 @@ public class MirrorPoint
         this.scheduledMaintainTask = new AtomicReference<>();
     }
 
-    public ChannelGroup getChannels()
-    {
+    public ChannelGroup getChannels() {
         return channels;
     }
 
-    public Future<?> start()
-    {
+    public Future<?> start() {
         return new ServerBootstrap()
                 .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classServerSocketChannel)
-                .childHandler(new ChannelInitializer<SocketChannel>()
-                {
+                .childHandler(new ChannelInitializer<SocketChannel>() {
 
                     @Override
-                    protected void initChannel(SocketChannel ch) throws Exception
-                    {
+                    protected void initChannel(SocketChannel ch) throws Exception {
                         ch.attr(Vars.LINKCONTEXT_KEY).set(new LinkContext(manager, ch));
                         ch.newSucceededFuture().addListener(manager.getResources().getChannelAccumulator());
-                        ch.closeFuture().addListener(future -> {
-                            ch.eventLoop().execute(() -> {
-                                Throwable error = Vars.ChannelError.get(ch);
-                                if (error != null)
-                                {
-                                    SimpleLogger.printStackTrace(error);
-                                    SimpleLogger.println("%s > [%s] link %s closed with unexpected error. (%s)", Shared.printNow(), config.getName(), ch.id(), error);
-                                }
-                            });
-                        });
 
                         ch.pipeline().addLast(new ReadTimeoutHandler(600));
                         ch.pipeline().addLast(new WriteTimeoutHandler(60));
@@ -92,8 +76,7 @@ public class MirrorPoint
                 });
     }
 
-    public Future<?> stop()
-    {
+    public Future<?> stop() {
         return channels.close().addListener(future -> {
             manager.getSessions().values().forEach(LinkSession::close);
             Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false));
@@ -101,8 +84,7 @@ public class MirrorPoint
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return config.getName();
     }
 

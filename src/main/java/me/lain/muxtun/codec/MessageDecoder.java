@@ -6,42 +6,33 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.util.ReferenceCountUtil;
 import me.lain.muxtun.codec.Message.MessageType;
 
-public class MessageDecoder extends LengthFieldBasedFrameDecoder
-{
+public class MessageDecoder extends LengthFieldBasedFrameDecoder {
 
-    public MessageDecoder()
-    {
+    public MessageDecoder() {
         super(1048576, 0, 3, 0, 3);
         setCumulator(COMPOSITE_CUMULATOR);
     }
 
     @Override
-    protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception
-    {
+    protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         Object obj = super.decode(ctx, in);
 
-        if (obj instanceof ByteBuf)
-        {
+        if (obj instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) obj;
             Message msg = null;
             boolean release = true;
 
-            try
-            {
+            try {
                 msg = MessageType.find(buf.readByte()).create();
                 msg.decode(buf);
                 release = false;
                 return msg;
-            }
-            finally
-            {
+            } finally {
                 if (release && msg != null)
                     ReferenceCountUtil.release(msg);
                 ReferenceCountUtil.release(buf);
             }
-        }
-        else
-        {
+        } else {
             return obj;
         }
     }

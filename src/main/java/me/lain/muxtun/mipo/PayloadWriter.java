@@ -1,50 +1,40 @@
 package me.lain.muxtun.mipo;
 
-import java.util.ArrayList;
-import java.util.List;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FastThreadLocal;
 
-@FunctionalInterface
-interface PayloadWriter
-{
+import java.util.ArrayList;
+import java.util.List;
 
-    static final FastThreadLocal<List<ByteBuf>> SLICES_LIST = new FastThreadLocal<List<ByteBuf>>()
-    {
+@FunctionalInterface
+interface PayloadWriter {
+
+    static final FastThreadLocal<List<ByteBuf>> SLICES_LIST = new FastThreadLocal<List<ByteBuf>>() {
 
         @Override
-        protected List<ByteBuf> initialValue() throws Exception
-        {
+        protected List<ByteBuf> initialValue() throws Exception {
             return new ArrayList<>();
         }
 
     };
 
-    static List<ByteBuf> slices(ByteBuf in, int size, List<ByteBuf> list)
-    {
+    static List<ByteBuf> slices(ByteBuf in, int size, List<ByteBuf> list) {
         if (list == null)
             list = SLICES_LIST.get();
 
         int length = in.readableBytes();
-        if (length > size)
-        {
-            for (;;)
-            {
-                if (length > size)
-                {
+        if (length > size) {
+            for (; ; ) {
+                if (length > size) {
                     list.add(in.readSlice(size));
                     length -= size;
-                }
-                else
-                {
+                } else {
                     list.add(in.readSlice(length));
                     break;
                 }
             }
-        }
-        else
-        {
+        } else {
             list.add(in);
         }
 
@@ -53,30 +43,21 @@ interface PayloadWriter
 
     boolean write(ByteBuf payload) throws Exception;
 
-    default boolean writeSlices(ByteBuf payload) throws Exception
-    {
+    default boolean writeSlices(ByteBuf payload) throws Exception {
         return writeSlices(payload, 8192, null);
     }
 
-    default boolean writeSlices(ByteBuf payload, int size, List<ByteBuf> list) throws Exception
-    {
-        try
-        {
-            for (ByteBuf slice : (list = slices(payload, size, list)))
-            {
-                try
-                {
+    default boolean writeSlices(ByteBuf payload, int size, List<ByteBuf> list) throws Exception {
+        try {
+            for (ByteBuf slice : (list = slices(payload, size, list))) {
+                try {
                     if (!write(slice.retain(2)))
                         return false;
-                }
-                finally
-                {
+                } finally {
                     ReferenceCountUtil.release(slice);
                 }
             }
-        }
-        finally
-        {
+        } finally {
             ReferenceCountUtil.release(payload);
             if (list != null)
                 list.clear();

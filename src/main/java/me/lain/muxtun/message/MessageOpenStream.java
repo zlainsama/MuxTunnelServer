@@ -1,40 +1,35 @@
 package me.lain.muxtun.message;
 
-import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import me.lain.muxtun.codec.Message;
 
-public class MessageOpenStream implements Message
-{
+import java.util.UUID;
 
-    public static MessageOpenStream create()
-    {
-        return new MessageOpenStream();
-    }
+public class MessageOpenStream implements Message {
 
     private int seq;
     private UUID id;
 
-    private MessageOpenStream()
-    {
+    private MessageOpenStream() {
+    }
+
+    public static MessageOpenStream create() {
+        return new MessageOpenStream();
     }
 
     @Override
-    public Message copy()
-    {
+    public Message copy() {
         return type().create().setSeq(getSeq()).setId(getId());
     }
 
     @Override
-    public void decode(ByteBuf buf) throws Exception
-    {
+    public void decode(ByteBuf buf) throws Exception {
         setSeq(buf.readInt());
         setId(buf.readableBytes() == 16 ? new UUID(buf.readLong(), buf.readLong()) : null);
     }
 
     @Override
-    public void encode(ByteBuf buf) throws Exception
-    {
+    public void encode(ByteBuf buf) throws Exception {
         int _seq = getSeq();
         buf.writeInt(_seq);
 
@@ -44,40 +39,34 @@ public class MessageOpenStream implements Message
     }
 
     @Override
-    public UUID getId()
-    {
+    public UUID getId() {
         return id;
     }
 
     @Override
-    public int getSeq()
-    {
-        return seq;
-    }
-
-    @Override
-    public MessageOpenStream setId(UUID id)
-    {
+    public MessageOpenStream setId(UUID id) {
         this.id = id;
         return this;
     }
 
     @Override
-    public MessageOpenStream setSeq(int seq)
-    {
+    public int getSeq() {
+        return seq;
+    }
+
+    @Override
+    public MessageOpenStream setSeq(int seq) {
         this.seq = seq;
         return this;
     }
 
     @Override
-    public int size()
-    {
+    public int size() {
         return getId() != null ? 20 : 4;
     }
 
     @Override
-    public MessageType type()
-    {
+    public MessageType type() {
         return MessageType.OPENSTREAM;
     }
 

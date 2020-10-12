@@ -1,49 +1,40 @@
 package me.lain.muxtun.message;
 
-import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCounted;
 import me.lain.muxtun.codec.Message;
 
-public class MessageJoinSession implements Message, ReferenceCounted
-{
+import java.util.UUID;
 
-    public static MessageJoinSession create()
-    {
-        return new MessageJoinSession();
-    }
+public class MessageJoinSession implements Message, ReferenceCounted {
 
     private UUID id;
     private UUID id2;
     private ByteBuf buf;
 
-    private MessageJoinSession()
-    {
+    private MessageJoinSession() {
+    }
+
+    public static MessageJoinSession create() {
+        return new MessageJoinSession();
     }
 
     @Override
-    public Message copy()
-    {
+    public Message copy() {
         return type().create().setId(getId()).setId2(getId2()).setBuf(Vars.retainedDuplicate(getBuf()));
     }
 
     @Override
-    public void decode(ByteBuf buf) throws Exception
-    {
-        if (buf.readableBytes() < 16)
-        {
+    public void decode(ByteBuf buf) throws Exception {
+        if (buf.readableBytes() < 16) {
             setId(null);
             setId2(null);
             setBuf(null);
-        }
-        else if (buf.readableBytes() < 32)
-        {
+        } else if (buf.readableBytes() < 32) {
             setId(new UUID(buf.readLong(), buf.readLong()));
             setId2(null);
             setBuf(buf.readableBytes() > 0 ? buf.readBytes(buf.readableBytes()) : null);
-        }
-        else
-        {
+        } else {
             setId(new UUID(buf.readLong(), buf.readLong()));
             setId2(new UUID(buf.readLong(), buf.readLong()));
             setBuf(buf.readableBytes() > 0 ? buf.readBytes(buf.readableBytes()) : null);
@@ -51,11 +42,9 @@ public class MessageJoinSession implements Message, ReferenceCounted
     }
 
     @Override
-    public void encode(ByteBuf buf) throws Exception
-    {
+    public void encode(ByteBuf buf) throws Exception {
         UUID _id = getId();
-        if (_id != null)
-        {
+        if (_id != null) {
             buf.writeLong(_id.getMostSignificantBits()).writeLong(_id.getLeastSignificantBits());
 
             UUID _id2 = getId2();
@@ -69,109 +58,94 @@ public class MessageJoinSession implements Message, ReferenceCounted
     }
 
     @Override
-    public ByteBuf getBuf()
-    {
+    public ByteBuf getBuf() {
         return buf;
     }
 
     @Override
-    public UUID getId()
-    {
+    public MessageJoinSession setBuf(ByteBuf buf) {
+        this.buf = buf;
+        return this;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 
     @Override
-    public UUID getId2()
-    {
+    public MessageJoinSession setId(UUID id) {
+        this.id = id;
+        return this;
+    }
+
+    @Override
+    public UUID getId2() {
         return id2;
     }
 
     @Override
-    public int refCnt()
-    {
+    public MessageJoinSession setId2(UUID id2) {
+        this.id2 = id2;
+        return this;
+    }
+
+    @Override
+    public int refCnt() {
         if (buf != null)
             return buf.refCnt();
         return 0;
     }
 
     @Override
-    public boolean release()
-    {
+    public boolean release() {
         if (buf != null)
             return buf.release();
         return false;
     }
 
     @Override
-    public boolean release(int decrement)
-    {
+    public boolean release(int decrement) {
         if (buf != null)
             return buf.release(decrement);
         return false;
     }
 
     @Override
-    public MessageJoinSession retain()
-    {
+    public MessageJoinSession retain() {
         if (buf != null)
             buf.retain();
         return this;
     }
 
     @Override
-    public MessageJoinSession retain(int increment)
-    {
+    public MessageJoinSession retain(int increment) {
         if (buf != null)
             buf.retain(increment);
         return this;
     }
 
     @Override
-    public MessageJoinSession setBuf(ByteBuf buf)
-    {
-        this.buf = buf;
-        return this;
-    }
-
-    @Override
-    public MessageJoinSession setId(UUID id)
-    {
-        this.id = id;
-        return this;
-    }
-
-    @Override
-    public MessageJoinSession setId2(UUID id2)
-    {
-        this.id2 = id2;
-        return this;
-    }
-
-    @Override
-    public int size()
-    {
+    public int size() {
         return getId() != null ? 16 + (getId2() != null ? 16 : 0) + Vars.getSize(getBuf()) : 0;
     }
 
     @Override
-    public MessageJoinSession touch()
-    {
+    public MessageJoinSession touch() {
         if (buf != null)
             buf.touch();
         return this;
     }
 
     @Override
-    public MessageJoinSession touch(Object hint)
-    {
+    public MessageJoinSession touch(Object hint) {
         if (buf != null)
             buf.touch(hint);
         return this;
     }
 
     @Override
-    public MessageType type()
-    {
+    public MessageType type() {
         return MessageType.JOINSESSION;
     }
 

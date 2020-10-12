@@ -1,29 +1,8 @@
 package me.lain.muxtun.mipo;
 
-import java.net.SocketAddress;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.IntConsumer;
-import java.util.stream.Collectors;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.channel.*;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
@@ -40,8 +19,19 @@ import me.lain.muxtun.codec.Message.MessageType;
 import me.lain.muxtun.util.FlowControl;
 import me.lain.muxtun.util.SimpleLogger;
 
-class LinkSession
-{
+import java.net.SocketAddress;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntConsumer;
+import java.util.stream.Collectors;
+
+class LinkSession {
 
     private final UUID sessionId;
     private final LinkManager manager;
@@ -58,8 +48,7 @@ class LinkSession
     private final Set<UUID> closedStreams;
     private final AtomicInteger timeoutCounter;
 
-    LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge, SocketAddress targetAddress)
-    {
+    LinkSession(UUID sessionId, LinkManager manager, EventExecutor executor, byte[] challenge, SocketAddress targetAddress) {
         this.sessionId = sessionId;
         this.manager = manager;
         this.executor = executor;
@@ -76,8 +65,7 @@ class LinkSession
         this.timeoutCounter = new AtomicInteger();
     }
 
-    void acknowledge(int ack, int sack)
-    {
+    void acknowledge(int ack, int sack) {
         if (!isActive())
             return;
 
@@ -87,19 +75,14 @@ class LinkSession
             getExecutor().execute(() -> acknowledge0(ack, sack));
     }
 
-    private void acknowledge0(int ack, int sack)
-    {
+    private void acknowledge0(int ack, int sack) {
         if (getFlowControl().acknowledge(getOutboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
             Message removed = getOutboundBuffer().remove(seq);
 
-            if (removed != null)
-            {
-                try
-                {
-                    switch (removed.type())
-                    {
-                        case DATASTREAM:
-                        {
+            if (removed != null) {
+                try {
+                    switch (removed.type()) {
+                        case DATASTREAM: {
                             StreamContext context = getStreams().get(removed.getId());
 
                             if (context != null)
@@ -110,9 +93,7 @@ class LinkSession
                         default:
                             break;
                     }
-                }
-                finally
-                {
+                } finally {
                     ReferenceCountUtil.release(removed);
                 }
             }
@@ -120,52 +101,43 @@ class LinkSession
             flush();
     }
 
-    void close()
-    {
+    void close() {
         if (getExecutor().inEventLoop())
             close0();
         else
             getExecutor().execute(() -> close0());
     }
 
-    private void close0()
-    {
+    private void close0() {
         closed.set(true);
 
         manager.getSessions().remove(sessionId, this);
 
-        while (!members.isEmpty())
-        {
+        while (!members.isEmpty()) {
             members.removeAll(members.stream().peek(Channel::close).collect(Collectors.toList()));
         }
-        while (!streams.isEmpty())
-        {
+        while (!streams.isEmpty()) {
             streams.values().removeAll(streams.values().stream().peek(StreamContext::close).collect(Collectors.toList()));
         }
         closedStreams.clear();
-        while (!inboundBuffer.isEmpty())
-        {
+        while (!inboundBuffer.isEmpty()) {
             inboundBuffer.values().removeAll(inboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
         }
-        while (!outboundBuffer.isEmpty())
-        {
+        while (!outboundBuffer.isEmpty()) {
             outboundBuffer.values().removeAll(outboundBuffer.values().stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
         }
-        while (!pendingMessages.isEmpty())
-        {
+        while (!pendingMessages.isEmpty()) {
             pendingMessages.removeAll(pendingMessages.stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
         }
 
         System.gc();
     }
 
-    boolean drop(Channel channel)
-    {
+    boolean drop(Channel channel) {
         return getMembers().remove(channel);
     }
 
-    void flush()
-    {
+    void flush() {
         if (!isActive())
             return;
 
@@ -175,37 +147,29 @@ class LinkSession
             getExecutor().execute(() -> flush0());
     }
 
-    private void flush0()
-    {
-        while (getFlowControl().window() > 0 && !getPendingMessages().isEmpty())
-        {
+    private void flush0() {
+        while (getFlowControl().window() > 0 && !getPendingMessages().isEmpty()) {
             if (!isActive())
                 break;
 
             getFlowControl().tryAdvanceSequence(seq -> {
                 Message pending = getPendingMessages().poll();
 
-                if (pending != null)
-                {
-                    if (getOutboundBuffer().putIfAbsent(seq, pending.setSeq(seq)) != null)
-                    {
+                if (pending != null) {
+                    if (getOutboundBuffer().putIfAbsent(seq, pending.setSeq(seq)) != null) {
                         ReferenceCountUtil.release(pending);
                         throw new Error("OverlappedSequenceId " + seq);
                     }
 
-                    switch (pending.type())
-                    {
+                    switch (pending.type()) {
                         case OPENSTREAM:
-                        case OPENSTREAMUDP:
-                        {
+                        case OPENSTREAMUDP: {
                             UUID id = pending.getId();
 
-                            if (id != null)
-                            {
+                            if (id != null) {
                                 StreamContext sctx = getStreams().get(id);
 
-                                if (sctx != null)
-                                {
+                                if (sctx != null) {
                                     if (sctx.first().get() && sctx.first().compareAndSet(true, false))
                                         sctx.lastSeq().set(seq);
                                 }
@@ -214,57 +178,42 @@ class LinkSession
                             break;
                         }
                         case CLOSESTREAM:
-                        case DATASTREAM:
-                        {
+                        case DATASTREAM: {
                             UUID id = pending.getId();
 
-                            if (id != null)
-                            {
+                            if (id != null) {
                                 StreamContext sctx = getStreams().get(id);
 
-                                if (sctx != null)
-                                {
+                                if (sctx != null) {
                                     if (sctx.first().get() && sctx.first().compareAndSet(true, false))
                                         sctx.lastSeq().set(getFlowControl().lastAck() - 1);
                                     pending.setReq(sctx.lastSeq().getAndSet(seq));
-                                }
-                                else
-                                {
+                                } else {
                                     pending.setReq(seq - 1);
                                 }
-                            }
-                            else
-                            {
+                            } else {
                                 pending.setReq(seq - 1);
                             }
 
                             break;
                         }
-                        default:
-                        {
+                        default: {
                             break;
                         }
                     }
 
-                    getExecutor().execute(new Runnable()
-                    {
+                    getExecutor().execute(new Runnable() {
 
                         long lastRTO = 250L;
 
-                        boolean duplicate(Message msg, Consumer<Message> action, Consumer<Throwable> logger)
-                        {
-                            try
-                            {
+                        boolean duplicate(Message msg, Consumer<Message> action, Consumer<Throwable> logger) {
+                            try {
                                 action.accept(msg.copy());
 
                                 return true;
-                            }
-                            catch (IllegalReferenceCountException ignored)
-                            {
+                            } catch (IllegalReferenceCountException ignored) {
                                 return false;
-                            }
-                            catch (Throwable e)
-                            {
+                            } catch (Throwable e) {
                                 logger.accept(e);
 
                                 return true;
@@ -272,38 +221,28 @@ class LinkSession
                         }
 
                         @Override
-                        public void run()
-                        {
+                        public void run() {
                             Message msg = getOutboundBuffer().get(seq);
 
-                            if (msg != null && isActive())
-                            {
+                            if (msg != null && isActive()) {
                                 Optional<Channel> link = getMembers().stream().sequential()
                                         .filter(channel -> channel.isActive() && channel.isWritable() && LinkContext.getContext(channel).getSession() == LinkSession.this)
                                         .sorted(LinkContext.SORTER)
                                         .filter(channel -> LinkContext.getContext(channel).getTasks().putIfAbsent(seq, this) == null)
                                         .findFirst();
 
-                                if (link.isPresent())
-                                {
+                                if (link.isPresent()) {
                                     LinkContext context = LinkContext.getContext(link.get());
 
-                                    if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace))
-                                    {
+                                    if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace)) {
                                         getExecutor().schedule(this, lastRTO = context.getSRTT().rto(), TimeUnit.MILLISECONDS);
-                                    }
-                                    else
-                                    {
+                                    } else {
                                         getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
                                     }
-                                }
-                                else
-                                {
+                                } else {
                                     getExecutor().schedule(this, lastRTO, TimeUnit.MILLISECONDS);
                                 }
-                            }
-                            else
-                            {
+                            } else {
                                 getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));
                             }
                         }
@@ -318,105 +257,83 @@ class LinkSession
         }
     }
 
-    byte[] getChallenge()
-    {
+    byte[] getChallenge() {
         return challenge;
     }
 
-    Set<UUID> getClosedStreams()
-    {
+    Set<UUID> getClosedStreams() {
         return closedStreams;
     }
 
-    EventExecutor getExecutor()
-    {
+    EventExecutor getExecutor() {
         return executor;
     }
 
-    FlowControl getFlowControl()
-    {
+    FlowControl getFlowControl() {
         return flowControl;
     }
 
-    Map<Integer, Message> getInboundBuffer()
-    {
+    Map<Integer, Message> getInboundBuffer() {
         return inboundBuffer;
     }
 
-    LinkManager getManager()
-    {
+    LinkManager getManager() {
         return manager;
     }
 
-    Set<Channel> getMembers()
-    {
+    Set<Channel> getMembers() {
         return members;
     }
 
-    Map<Integer, Message> getOutboundBuffer()
-    {
+    Map<Integer, Message> getOutboundBuffer() {
         return outboundBuffer;
     }
 
-    Deque<Message> getPendingMessages()
-    {
+    Deque<Message> getPendingMessages() {
         return pendingMessages;
     }
 
-    UUID getSessionId()
-    {
+    UUID getSessionId() {
         return sessionId;
     }
 
-    Map<UUID, StreamContext> getStreams()
-    {
+    Map<UUID, StreamContext> getStreams() {
         return streams;
     }
 
-    SocketAddress getTargetAddress()
-    {
+    SocketAddress getTargetAddress() {
         return targetAddress;
     }
 
-    AtomicInteger getTimeoutCounter()
-    {
+    AtomicInteger getTimeoutCounter() {
         return timeoutCounter;
     }
 
-    void handleMessage(Message msg)
-    {
+    void handleMessage(Message msg) {
         if (getExecutor().inEventLoop())
             handleMessage0(msg);
         else
             getExecutor().execute(() -> handleMessage0(msg));
     }
 
-    private Message handleMessage0(Message msg)
-    {
+    private Message handleMessage0(Message msg) {
         if (msg == null || msg == Vars.PLACEHOLDER)
             return null;
 
-        switch (msg.type())
-        {
-            case OPENSTREAM:
-            {
-                openTcpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
-                {
+        switch (msg.type()) {
+            case OPENSTREAM: {
+                openTcpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener() {
 
                     @Override
-                    public void operationComplete(ChannelFuture future) throws Exception
-                    {
-                        if (future.isSuccess())
-                        {
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if (future.isSuccess()) {
                             StreamContext context = StreamContext.getContext(future.channel());
                             writeAndFlush(MessageType.OPENSTREAM.create().setId(context.getStreamId()));
                             context.getChannel().closeFuture().addListener(closeFuture -> {
                                 if (getStreams().remove(context.getStreamId(), context))
                                     writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
                             });
-                        }
-                        else
-                        {
+                        } else {
                             writeAndFlush(MessageType.OPENSTREAM.create());
                         }
                     }
@@ -425,25 +342,19 @@ class LinkSession
 
                 break;
             }
-            case OPENSTREAMUDP:
-            {
-                openUdpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener()
-                {
+            case OPENSTREAMUDP: {
+                openUdpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener() {
 
                     @Override
-                    public void operationComplete(ChannelFuture future) throws Exception
-                    {
-                        if (future.isSuccess())
-                        {
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if (future.isSuccess()) {
                             StreamContext context = StreamContext.getContext(future.channel());
                             writeAndFlush(MessageType.OPENSTREAMUDP.create().setId(context.getStreamId()));
                             context.getChannel().closeFuture().addListener(closeFuture -> {
                                 if (getStreams().remove(context.getStreamId(), context))
                                     writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
                             });
-                        }
-                        else
-                        {
+                        } else {
                             writeAndFlush(MessageType.OPENSTREAMUDP.create());
                         }
                     }
@@ -452,18 +363,15 @@ class LinkSession
 
                 break;
             }
-            case CLOSESTREAM:
-            {
+            case CLOSESTREAM: {
                 UUID streamId = msg.getId();
 
-                if (getClosedStreams().add(streamId))
-                {
+                if (getClosedStreams().add(streamId)) {
                     getExecutor().schedule(() -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
                 }
 
                 StreamContext context = getStreams().remove(streamId);
-                if (context != null)
-                {
+                if (context != null) {
                     context.close();
                 }
 
@@ -478,28 +386,22 @@ class LinkSession
 
                 break;
             }
-            case DATASTREAM:
-            {
+            case DATASTREAM: {
                 UUID streamId = msg.getId();
                 ByteBuf payload = msg.getBuf();
 
-                if (!getClosedStreams().contains(streamId))
-                {
+                if (!getClosedStreams().contains(streamId)) {
                     StreamContext context = getStreams().get(streamId);
-                    if (context != null)
-                    {
+                    if (context != null) {
                         context.writeAndFlush(payload.retain());
-                    }
-                    else
-                    {
+                    } else {
                         writeAndFlush(MessageType.CLOSESTREAM.create().setId(streamId));
                     }
                 }
 
                 break;
             }
-            default:
-            {
+            default: {
                 break;
             }
         }
@@ -507,40 +409,32 @@ class LinkSession
         return msg;
     }
 
-    boolean isActive()
-    {
+    boolean isActive() {
         return !closed.get();
     }
 
-    boolean join(Channel channel)
-    {
+    boolean join(Channel channel) {
         return getMembers().add(channel);
     }
 
-    PayloadWriter newPayloadWriter(StreamContext context)
-    {
+    PayloadWriter newPayloadWriter(StreamContext context) {
         return payload -> {
-            try
-            {
+            try {
                 if (!isActive())
                     return false;
                 int size = payload.readableBytes();
                 writeAndFlush(MessageType.DATASTREAM.create().setId(context.getStreamId()).setBuf(payload.retain()));
                 context.updateQuota(i -> i - size);
                 return true;
-            }
-            finally
-            {
+            } finally {
                 ReferenceCountUtil.release(payload);
             }
         };
     }
 
-    StreamContext newStreamContext(Channel channel)
-    {
-        for (;;)
-        {
-            boolean[] created = new boolean[] { false };
+    StreamContext newStreamContext(Channel channel) {
+        for (; ; ) {
+            boolean[] created = new boolean[]{false};
             StreamContext context = getStreams().computeIfAbsent(UUID.randomUUID(), streamId -> {
                 if (getClosedStreams().contains(streamId))
                     return null;
@@ -553,17 +447,14 @@ class LinkSession
         }
     }
 
-    ChannelFuture openTcpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
-    {
+    ChannelFuture openTcpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder) {
         return new Bootstrap()
                 .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classSocketChannel)
-                .handler(new ChannelInitializer<SocketChannel>()
-                {
+                .handler(new ChannelInitializer<SocketChannel>() {
 
                     @Override
-                    protected void initChannel(SocketChannel ch) throws Exception
-                    {
+                    protected void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
                         ch.pipeline().addLast(TcpStreamHandler.DEFAULT);
                     }
@@ -574,14 +465,11 @@ class LinkSession
                 .option(ChannelOption.AUTO_READ, false)
                 .connect(remoteAddress)
                 .addListener(getManager().getResources().getChannelAccumulator())
-                .addListener(new ChannelFutureListener()
-                {
+                .addListener(new ChannelFutureListener() {
 
                     @Override
-                    public void operationComplete(ChannelFuture future) throws Exception
-                    {
-                        if (future.isSuccess())
-                        {
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if (future.isSuccess()) {
                             Channel channel = future.channel();
                             channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
                             channel.config().setAutoRead(true);
@@ -591,23 +479,18 @@ class LinkSession
                 });
     }
 
-    ChannelFuture openUdpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder)
-    {
+    ChannelFuture openUdpStream(SocketAddress remoteAddress, Function<Channel, StreamContext> contextBuilder) {
         return new Bootstrap()
                 .group(Vars.WORKERS)
                 .channel(Shared.NettyObjects.classDatagramChannel)
-                .handler(new ChannelInitializer<DatagramChannel>()
-                {
+                .handler(new ChannelInitializer<DatagramChannel>() {
 
                     @Override
-                    protected void initChannel(DatagramChannel ch) throws Exception
-                    {
-                        ch.pipeline().addLast(new IdleStateHandler(0, 0, 60)
-                        {
+                    protected void initChannel(DatagramChannel ch) throws Exception {
+                        ch.pipeline().addLast(new IdleStateHandler(0, 0, 60) {
 
                             @Override
-                            protected void channelIdle(ChannelHandlerContext ctx, IdleStateEvent evt) throws Exception
-                            {
+                            protected void channelIdle(ChannelHandlerContext ctx, IdleStateEvent evt) throws Exception {
                                 if (evt.state() == IdleState.ALL_IDLE)
                                     ctx.close();
                             }
@@ -621,14 +504,11 @@ class LinkSession
                 .option(ChannelOption.AUTO_READ, false)
                 .connect(remoteAddress)
                 .addListener(getManager().getResources().getChannelAccumulator())
-                .addListener(new ChannelFutureListener()
-                {
+                .addListener(new ChannelFutureListener() {
 
                     @Override
-                    public void operationComplete(ChannelFuture future) throws Exception
-                    {
-                        if (future.isSuccess())
-                        {
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if (future.isSuccess()) {
                             Channel channel = future.channel();
                             channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
                             channel.config().setAutoRead(true);
@@ -638,10 +518,8 @@ class LinkSession
                 });
     }
 
-    void tick()
-    {
-        if (isActive())
-        {
+    void tick() {
+        if (isActive()) {
             if (getExecutor().inEventLoop())
                 tick0();
             else
@@ -649,24 +527,19 @@ class LinkSession
         }
     }
 
-    private void tick0()
-    {
+    private void tick0() {
         Set<Channel> members = getMembers();
 
-        if (members.isEmpty())
-        {
+        if (members.isEmpty()) {
             if (getTimeoutCounter().incrementAndGet() > 30)
                 close();
-        }
-        else
-        {
+        } else {
             getTimeoutCounter().set(0);
             members.stream().map(LinkContext::getContext).forEach(LinkContext::tick);
         }
     }
 
-    void updateReceived(IntConsumer acknowledger)
-    {
+    void updateReceived(IntConsumer acknowledger) {
         if (!isActive())
             return;
 
@@ -676,8 +549,7 @@ class LinkSession
             getExecutor().execute(() -> updateReceived0(acknowledger));
     }
 
-    private void updateReceived0(IntConsumer acknowledger)
-    {
+    private void updateReceived0(IntConsumer acknowledger) {
         acknowledger.accept(getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
             ReferenceCountUtil.release(handleMessage0(getInboundBuffer().remove(seq)));
         }, seq -> {
@@ -685,29 +557,24 @@ class LinkSession
         }, (seq, expect) -> {
             Message msg = getInboundBuffer().get(seq);
 
-            if (msg != null && msg != Vars.PLACEHOLDER)
-            {
-                switch (msg.type())
-                {
+            if (msg != null && msg != Vars.PLACEHOLDER) {
+                switch (msg.type()) {
                     case OPENSTREAM:
-                    case OPENSTREAMUDP:
-                    {
+                    case OPENSTREAMUDP: {
                         if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
                             ReferenceCountUtil.release(handleMessage0(msg));
 
                         break;
                     }
                     case CLOSESTREAM:
-                    case DATASTREAM:
-                    {
+                    case DATASTREAM: {
                         if (expect - msg.getReq() > 0 || getInboundBuffer().get(msg.getReq()) == Vars.PLACEHOLDER)
                             if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
                                 ReferenceCountUtil.release(handleMessage0(msg));
 
                         break;
                     }
-                    default:
-                    {
+                    default: {
                         break;
                     }
                 }
@@ -717,83 +584,62 @@ class LinkSession
         }));
     }
 
-    boolean write(Message msg)
-    {
+    boolean write(Message msg) {
         return write(msg, false);
     }
 
-    boolean write(Message msg, boolean force)
-    {
-        try
-        {
+    boolean write(Message msg, boolean force) {
+        try {
             if (!isActive())
                 return false;
 
-            switch (msg.type())
-            {
-                case OPENSTREAM:
-                {
+            switch (msg.type()) {
+                case OPENSTREAM: {
                     getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
                     return true;
                 }
-                case OPENSTREAMUDP:
-                {
+                case OPENSTREAMUDP: {
                     getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
                     return true;
                 }
-                case CLOSESTREAM:
-                {
+                case CLOSESTREAM: {
                     UUID streamId = msg.getId();
 
-                    if (getClosedStreams().add(streamId))
-                    {
+                    if (getClosedStreams().add(streamId)) {
                         getExecutor().schedule(() -> getClosedStreams().remove(streamId), 30L, TimeUnit.SECONDS);
                         getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
-                    }
-                    else if (force)
-                    {
+                    } else if (force) {
                         getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
-                    }
-                    else
-                    {
+                    } else {
                         return false;
                     }
                 }
-                case DATASTREAM:
-                {
+                case DATASTREAM: {
                     UUID streamId = msg.getId();
 
-                    if (!getClosedStreams().contains(streamId) || force)
-                    {
+                    if (!getClosedStreams().contains(streamId) || force) {
                         getPendingMessages().addLast(ReferenceCountUtil.retain(msg));
                         return true;
-                    }
-                    else
-                    {
+                    } else {
                         return false;
                     }
                 }
-                default:
-                {
+                default: {
                     return false;
                 }
             }
-        }
-        finally
-        {
+        } finally {
             ReferenceCountUtil.release(msg);
         }
     }
 
-    void writeAndFlush(Message msg)
-    {
+    void writeAndFlush(Message msg) {
         writeAndFlush(msg, false);
     }
 
-    void writeAndFlush(Message msg, boolean force)
-    {
+    void writeAndFlush(Message msg, boolean force) {
         write(msg, force);
         flush();
     }

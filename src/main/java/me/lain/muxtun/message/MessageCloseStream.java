@@ -1,42 +1,37 @@
 package me.lain.muxtun.message;
 
-import java.util.UUID;
 import io.netty.buffer.ByteBuf;
 import me.lain.muxtun.codec.Message;
 
-public class MessageCloseStream implements Message
-{
+import java.util.UUID;
 
-    public static MessageCloseStream create()
-    {
-        return new MessageCloseStream();
-    }
+public class MessageCloseStream implements Message {
 
     private int seq;
     private int req;
     private UUID id;
 
-    private MessageCloseStream()
-    {
+    private MessageCloseStream() {
+    }
+
+    public static MessageCloseStream create() {
+        return new MessageCloseStream();
     }
 
     @Override
-    public Message copy()
-    {
+    public Message copy() {
         return type().create().setSeq(getSeq()).setReq(getReq()).setId(getId());
     }
 
     @Override
-    public void decode(ByteBuf buf) throws Exception
-    {
+    public void decode(ByteBuf buf) throws Exception {
         setSeq(buf.readInt());
         setReq(buf.readInt());
         setId(new UUID(buf.readLong(), buf.readLong()));
     }
 
     @Override
-    public void encode(ByteBuf buf) throws Exception
-    {
+    public void encode(ByteBuf buf) throws Exception {
         int _seq = getSeq();
         buf.writeInt(_seq);
 
@@ -48,53 +43,45 @@ public class MessageCloseStream implements Message
     }
 
     @Override
-    public UUID getId()
-    {
+    public UUID getId() {
         return id;
     }
 
     @Override
-    public int getReq()
-    {
-        return req;
-    }
-
-    @Override
-    public int getSeq()
-    {
-        return seq;
-    }
-
-    @Override
-    public MessageCloseStream setId(UUID id)
-    {
+    public MessageCloseStream setId(UUID id) {
         this.id = id;
         return this;
     }
 
     @Override
-    public MessageCloseStream setReq(int req)
-    {
+    public int getReq() {
+        return req;
+    }
+
+    @Override
+    public MessageCloseStream setReq(int req) {
         this.req = req;
         return this;
     }
 
     @Override
-    public MessageCloseStream setSeq(int seq)
-    {
+    public int getSeq() {
+        return seq;
+    }
+
+    @Override
+    public MessageCloseStream setSeq(int seq) {
         this.seq = seq;
         return this;
     }
 
     @Override
-    public int size()
-    {
+    public int size() {
         return 24;
     }
 
     @Override
-    public MessageType type()
-    {
+    public MessageType type() {
         return MessageType.CLOSESTREAM;
     }
 
