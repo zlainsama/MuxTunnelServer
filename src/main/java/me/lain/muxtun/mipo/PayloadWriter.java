@@ -44,7 +44,7 @@ interface PayloadWriter {
     boolean write(ByteBuf payload) throws Exception;
 
     default boolean writeSlices(ByteBuf payload) throws Exception {
-        return writeSlices(payload, 8192, null);
+        return writeSlices(payload, 16384, null);
     }
 
     default boolean writeSlices(ByteBuf payload, int size, List<ByteBuf> list) throws Exception {

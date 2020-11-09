@@ -6,7 +6,6 @@ import io.netty.channel.*;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.flush.FlushConsolidationHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -455,7 +454,6 @@ class LinkSession {
 
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
                         ch.pipeline().addLast(TcpStreamHandler.DEFAULT);
                     }
 
@@ -496,7 +494,6 @@ class LinkSession {
                             }
 
                         });
-                        ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
                         ch.pipeline().addLast(UdpStreamHandler.DEFAULT);
                     }
 
@@ -531,7 +528,7 @@ class LinkSession {
         Set<Channel> members = getMembers();
 
         if (members.isEmpty()) {
-            if (getTimeoutCounter().incrementAndGet() > 30)
+            if (getTimeoutCounter().incrementAndGet() > 60)
                 close();
         } else {
             getTimeoutCounter().set(0);

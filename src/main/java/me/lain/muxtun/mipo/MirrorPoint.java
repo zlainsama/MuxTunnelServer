@@ -6,7 +6,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.flush.FlushConsolidationHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.concurrent.Future;
@@ -54,7 +53,6 @@ public class MirrorPoint {
 
                         ch.pipeline().addLast(new ReadTimeoutHandler(600));
                         ch.pipeline().addLast(new WriteTimeoutHandler(60));
-                        ch.pipeline().addLast(new FlushConsolidationHandler(64, true));
                         ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc()));
                         ch.pipeline().addLast(new MessageCodec());
                         ch.pipeline().addLast(LinkHandler.DEFAULT);
