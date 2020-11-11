@@ -40,10 +40,10 @@ public class MirrorPointConfig {
         this.name = name;
     }
 
-    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha1, List<String> ciphers, List<String> protocols) throws SSLException, IOException {
+    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha256, List<String> ciphers, List<String> protocols) throws SSLException, IOException {
         return SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ))
                 .clientAuth(ClientAuth.REQUIRE)
-                .trustManager(new FingerprintTrustManagerFactory(trustSha1))
+                .trustManager(FingerprintTrustManagerFactory.builder("SHA-256").fingerprints(trustSha256).build())
                 .ciphers(!ciphers.isEmpty() ? ciphers : !Shared.TLS.defaultCipherSuites.isEmpty() ? Shared.TLS.defaultCipherSuites : null, SupportedCipherSuiteFilter.INSTANCE)
                 .protocols(!protocols.isEmpty() ? protocols : !Shared.TLS.defaultProtocols.isEmpty() ? Shared.TLS.defaultProtocols : null)
                 .build();

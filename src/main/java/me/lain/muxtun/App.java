@@ -21,7 +21,7 @@ public class App {
     private static Map<UUID, SocketAddress> targetAddresses = new HashMap<>();
     private static Path pathCert = null;
     private static Path pathKey = null;
-    private static List<String> trustSha1 = new ArrayList<>();
+    private static List<String> trustSha256 = new ArrayList<>();
     private static List<String> ciphers = new ArrayList<>();
     private static List<String> protocols = new ArrayList<>();
     private static SslContext sslCtx = null;
@@ -88,8 +88,8 @@ public class App {
                     pathCert = FileSystems.getDefault().getPath(value);
                 } else if ("pathKey".equals(name)) {
                     pathKey = FileSystems.getDefault().getPath(value);
-                } else if ("trustSha1".equals(name)) {
-                    trustSha1.add(value);
+                } else if ("trustSha256".equals(name)) {
+                    trustSha256.add(value);
                 } else if ("ciphers".equals(name)) {
                     ciphers.addAll(Arrays.asList(value.split(":")));
                 } else if ("protocols".equals(name)) {
@@ -106,12 +106,12 @@ public class App {
                 failed = true;
             if (pathKey == null)
                 failed = true;
-            if (trustSha1.isEmpty())
+            if (trustSha256.isEmpty())
                 failed = true;
             if (failed)
                 System.exit(1);
 
-            sslCtx = MirrorPointConfig.buildContext(pathCert, pathKey, trustSha1, ciphers, protocols);
+            sslCtx = MirrorPointConfig.buildContext(pathCert, pathKey, trustSha256, ciphers, protocols);
         }
 
         SimpleLogger.println("%s > Starting...", Shared.printNow());
@@ -123,7 +123,7 @@ public class App {
         targetAddresses = null;
         pathCert = null;
         pathKey = null;
-        trustSha1 = null;
+        trustSha256 = null;
         ciphers = null;
         protocols = null;
         sslCtx = null;
