@@ -9,10 +9,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.util.concurrent.DefaultEventExecutorGroup;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.EventExecutorGroup;
-import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.*;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
@@ -40,11 +37,11 @@ public final class Shared {
         }
 
         @Override
-        public void write(byte b[]) throws IOException {
+        public void write(byte[] b) throws IOException {
         }
 
         @Override
-        public void write(byte b[], int off, int len) throws IOException {
+        public void write(byte[] b, int off, int len) throws IOException {
         }
 
         @Override
@@ -54,6 +51,20 @@ public final class Shared {
     };
 
     private Shared() {
+    }
+
+    public static Future<Void> combineFutures(Iterable<Future<?>> futures) {
+        return combineFutures(GlobalEventExecutor.INSTANCE, futures);
+    }
+
+    public static Future<Void> combineFutures(EventExecutor executor, Iterable<Future<?>> futures) {
+        Promise<Void> promise = executor.newPromise();
+        executor.execute(() -> {
+            PromiseCombiner combiner = new PromiseCombiner(executor);
+            futures.forEach(combiner::add);
+            combiner.finish(promise);
+        });
+        return promise;
     }
 
     public static String printNow() {

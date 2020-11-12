@@ -14,6 +14,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class App {
 
@@ -116,8 +117,10 @@ public class App {
 
         SimpleLogger.println("%s > Starting...", Shared.printNow());
         theServer = new MirrorPoint(new MirrorPointConfig(bindAddress, targetAddresses, sslCtx));
-        theServer.start().syncUninterruptibly();
-        SimpleLogger.println("%s > Done. [%s]", Shared.printNow(), theServer.toString());
+        if (theServer.start().awaitUninterruptibly(60L, TimeUnit.SECONDS))
+            SimpleLogger.println("%s > Done. [%s]", Shared.printNow(), theServer.toString());
+        else
+            System.exit(1);
 
         bindAddress = null;
         targetAddresses = null;
@@ -136,7 +139,7 @@ public class App {
                 List<Future<?>> futures = new ArrayList<>();
                 futures.addAll(Shared.NettyObjects.shutdownGracefully());
                 futures.add(theServer.stop());
-                futures.forEach(Future::syncUninterruptibly);
+                Shared.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
                 SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
                 Shared.sleep(100L);
             }
