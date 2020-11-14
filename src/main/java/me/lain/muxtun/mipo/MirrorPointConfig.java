@@ -7,7 +7,6 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.FingerprintTrustManagerFactory;
 import me.lain.muxtun.Shared;
 
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.file.Files;
@@ -40,7 +39,7 @@ public class MirrorPointConfig {
         this.name = name;
     }
 
-    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha256, List<String> ciphers, List<String> protocols) throws SSLException, IOException {
+    public static SslContext buildContext(Path pathCert, Path pathKey, List<String> trustSha256, List<String> ciphers, List<String> protocols) throws IOException {
         return SslContextBuilder.forServer(Files.newInputStream(pathCert, StandardOpenOption.READ), Files.newInputStream(pathKey, StandardOpenOption.READ))
                 .clientAuth(ClientAuth.REQUIRE)
                 .trustManager(FingerprintTrustManagerFactory.builder("SHA-256").fingerprints(trustSha256).build())

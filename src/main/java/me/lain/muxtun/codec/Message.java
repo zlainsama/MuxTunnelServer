@@ -36,7 +36,7 @@ public interface Message extends MessageAccess {
         private final byte id;
         private final MessageFactory factory;
 
-        private MessageType(int id, MessageFactory factory) {
+        MessageType(int id, MessageFactory factory) {
             this.id = (byte) id;
             this.factory = factory;
         }

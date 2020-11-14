@@ -10,7 +10,7 @@ import java.util.List;
 @FunctionalInterface
 interface PayloadWriter {
 
-    static final FastThreadLocal<List<ByteBuf>> SLICES_LIST = new FastThreadLocal<List<ByteBuf>>() {
+    FastThreadLocal<List<ByteBuf>> SLICES_LIST = new FastThreadLocal<List<ByteBuf>>() {
 
         @Override
         protected List<ByteBuf> initialValue() throws Exception {
