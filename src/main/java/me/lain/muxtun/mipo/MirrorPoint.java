@@ -12,6 +12,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.MessageCodec;
+import me.lain.muxtun.util.SharedPool;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -53,7 +54,7 @@ public class MirrorPoint {
 
                         ch.pipeline().addLast(new ReadTimeoutHandler(600));
                         ch.pipeline().addLast(new WriteTimeoutHandler(60));
-                        ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc()));
+                        ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc(), SharedPool.INSTANCE));
                         ch.pipeline().addLast(new MessageCodec());
                         ch.pipeline().addLast(LinkHandler.DEFAULT);
                     }

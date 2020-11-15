@@ -16,7 +16,7 @@ class Vars {
     static final AttributeKey<LinkContext> LINKCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#LinkContext");
     static final AttributeKey<StreamContext> STREAMCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#StreamContext");
 
-    static final EventLoopGroup WORKERS = Shared.NettyObjects.getOrCreateEventLoopGroup("workersGroup", Math.max(4, Math.min(Runtime.getRuntime().availableProcessors() * 2, Short.MAX_VALUE)));
+    static final EventLoopGroup WORKERS = Shared.NettyObjects.getOrCreateEventLoopGroup("workersGroup", Math.max(4, Math.min(Runtime.getRuntime().availableProcessors(), Short.MAX_VALUE)));
     static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventExecutorGroup("sessionsGroup", Math.max(4, Math.min(Runtime.getRuntime().availableProcessors(), Short.MAX_VALUE)));
 
     static final Message PLACEHOLDER = new Message() {
