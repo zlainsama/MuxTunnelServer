@@ -10,6 +10,11 @@ import me.lain.muxtun.codec.Message;
 
 class Vars {
 
+    static final String HANDLERNAME_TLS = "TLS";
+    static final String HANDLERNAME_CODEC = "Codec";
+    static final String HANDLERNAME_HANDLER = "Handler";
+    static final String HANDLERNAME_LIMITER = "Limiter";
+
     static final ByteBuf TRUE_BUFFER = Unpooled.unreleasableBuffer(Unpooled.directBuffer(1, 1).writeBoolean(true).asReadOnly());
     static final ByteBuf FALSE_BUFFER = Unpooled.unreleasableBuffer(Unpooled.directBuffer(1, 1).writeBoolean(false).asReadOnly());
 

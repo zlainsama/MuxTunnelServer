@@ -30,6 +30,7 @@ public interface Message extends MessageAccess {
         CLOSESTREAM(0x23, MessageCloseStream::create),
         DATASTREAM(0x24, MessageDataStream::create),
         ACKNOWLEDGE(0x25, MessageAcknowledge::create),
+        LINKCONFIG(0x26, MessageLinkConfig::create),
         UNKNOWN(0xFF, MessageType::createUnknown);
 
         private static final Map<Byte, MessageType> idMap = Collections.unmodifiableMap(Arrays.stream(values()).collect(Collectors.toMap(MessageType::getId, Function.identity())));

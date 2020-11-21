@@ -9,17 +9,19 @@ import me.lain.muxtun.util.SmoothedRoundTripTime;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class LinkContext {
 
     static final Comparator<Channel> SORTER = Comparator.comparingLong(channel -> {
         LinkContext context = LinkContext.getContext(channel);
-        return context.getSRTT().get() + context.getSRTT().var() * (1 + 2 * context.getTasks().size());
+        return context.getPriority().get() * 1000L + context.getSRTT().get() + context.getSRTT().var() * (1 + 2 * context.getTasks().size());
     });
 
     private final LinkManager manager;
     private final Channel channel;
     private final EventExecutor executor;
+    private final AtomicInteger priority;
     private final RoundTripTimeMeasurement RTTM;
     private final SmoothedRoundTripTime SRTT;
     private final Map<Integer, Runnable> tasks;
@@ -30,6 +32,7 @@ class LinkContext {
         this.manager = manager;
         this.channel = channel;
         this.executor = channel.eventLoop();
+        this.priority = new AtomicInteger();
         this.RTTM = new RoundTripTimeMeasurement();
         this.SRTT = new SmoothedRoundTripTime();
         this.tasks = new ConcurrentHashMap<>();
@@ -53,6 +56,10 @@ class LinkContext {
 
     LinkManager getManager() {
         return manager;
+    }
+
+    AtomicInteger getPriority() {
+        return priority;
     }
 
     RoundTripTimeMeasurement getRTTM() {

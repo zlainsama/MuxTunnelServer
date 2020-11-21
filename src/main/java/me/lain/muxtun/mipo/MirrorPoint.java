@@ -54,9 +54,9 @@ public class MirrorPoint {
 
                         ch.pipeline().addLast(new ReadTimeoutHandler(600));
                         ch.pipeline().addLast(new WriteTimeoutHandler(60));
-                        ch.pipeline().addLast(config.getSslCtx().newHandler(ch.alloc(), SharedPool.INSTANCE));
-                        ch.pipeline().addLast(new MessageCodec());
-                        ch.pipeline().addLast(LinkHandler.DEFAULT);
+                        ch.pipeline().addLast(Vars.HANDLERNAME_TLS, config.getSslCtx().newHandler(ch.alloc(), SharedPool.INSTANCE));
+                        ch.pipeline().addLast(Vars.HANDLERNAME_CODEC, new MessageCodec());
+                        ch.pipeline().addLast(Vars.HANDLERNAME_HANDLER, LinkHandler.DEFAULT);
                     }
 
                 })

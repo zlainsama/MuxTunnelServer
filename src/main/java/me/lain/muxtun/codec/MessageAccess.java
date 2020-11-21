@@ -27,6 +27,10 @@ public interface MessageAccess {
         throw new UnsupportedOperationException();
     }
 
+    default short getPriority() {
+        throw new UnsupportedOperationException();
+    }
+
     default int getReq() {
         throw new UnsupportedOperationException();
     }
@@ -36,6 +40,10 @@ public interface MessageAccess {
     }
 
     default int getSeq() {
+        throw new UnsupportedOperationException();
+    }
+
+    default long getWriteLimit() {
         throw new UnsupportedOperationException();
     }
 
@@ -55,6 +63,10 @@ public interface MessageAccess {
         throw new UnsupportedOperationException();
     }
 
+    default Message setPriority(short priority) {
+        throw new UnsupportedOperationException();
+    }
+
     default Message setReq(int req) {
         throw new UnsupportedOperationException();
     }
@@ -64,6 +76,10 @@ public interface MessageAccess {
     }
 
     default Message setSeq(int seq) {
+        throw new UnsupportedOperationException();
+    }
+
+    default Message setWriteLimit(long writeLimit) {
         throw new UnsupportedOperationException();
     }
 
