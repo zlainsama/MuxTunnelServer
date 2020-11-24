@@ -96,7 +96,7 @@ public final class SimpleLogger {
     public static void println() {
         execute(() -> {
             System.out.println();
-            fileOut.get().ifPresent(w -> w.println());
+            fileOut.get().ifPresent(PrintWriter::println);
         });
     }
 

@@ -4,7 +4,7 @@
 
     <groupId>me.lain</groupId>
     <artifactId>MuxTunnelServer</artifactId>
-    <version>0.2.38</version>
+    <version>0.2.39</version>
     <packaging>jar</packaging>
 
     <name>MuxTunnelServer</name>
@@ -35,7 +35,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>./lib/</classpathPrefix>
-                            <mainClass>me.lain.muxtun.EntryPoint</mainClass>
+                            <mainClass>me.lain.muxtun.App</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

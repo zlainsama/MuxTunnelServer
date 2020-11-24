@@ -8,6 +8,9 @@ import io.netty.util.concurrent.EventExecutorGroup;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 class Vars {
 
     static final String HANDLERNAME_TLS = "TLS";
@@ -21,8 +24,11 @@ class Vars {
     static final AttributeKey<LinkContext> LINKCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#LinkContext");
     static final AttributeKey<StreamContext> STREAMCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#StreamContext");
 
-    static final EventLoopGroup WORKERS = Shared.NettyObjects.getOrCreateEventLoopGroup("workersGroup", Math.max(4, Math.min(Runtime.getRuntime().availableProcessors(), Short.MAX_VALUE)));
-    static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventExecutorGroup("sessionsGroup", Math.max(4, Math.min(Runtime.getRuntime().availableProcessors(), Short.MAX_VALUE)));
+    static final int GROUP_THREADS = Math.max(4, Math.min(Runtime.getRuntime().availableProcessors(), Short.MAX_VALUE));
+    static final EventLoopGroup BOSSES = Shared.NettyObjects.getOrCreateEventLoopGroup("bossesGroup", GROUP_THREADS);
+    static final EventLoopGroup WORKERS = Shared.NettyObjects.getOrCreateEventLoopGroup("workersGroup", GROUP_THREADS);
+    static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventExecutorGroup("sessionsGroup", GROUP_THREADS);
+    static final ExecutorService SHARED_POOL = Executors.newWorkStealingPool(GROUP_THREADS);
 
     static final Message PLACEHOLDER = new Message() {
 

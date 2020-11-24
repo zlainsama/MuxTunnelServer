@@ -80,17 +80,11 @@ class LinkSession {
 
             if (removed != null) {
                 try {
-                    switch (removed.type()) {
-                        case DATASTREAM: {
-                            StreamContext context = getStreams().get(removed.getId());
+                    if (removed.type() == MessageType.DATASTREAM) {
+                        StreamContext context = getStreams().get(removed.getId());
 
-                            if (context != null)
-                                context.updateQuota(i -> i + removed.getBuf().readableBytes());
-
-                            break;
-                        }
-                        default:
-                            break;
+                        if (context != null)
+                            context.updateQuota(i -> i + removed.getBuf().readableBytes());
                     }
                 } finally {
                     ReferenceCountUtil.release(removed);
@@ -104,7 +98,7 @@ class LinkSession {
         if (getExecutor().inEventLoop())
             close0();
         else
-            getExecutor().execute(() -> close0());
+            getExecutor().execute(this::close0);
     }
 
     private void close0() {
@@ -143,7 +137,7 @@ class LinkSession {
         if (getExecutor().inEventLoop())
             flush0();
         else
-            getExecutor().execute(() -> flush0());
+            getExecutor().execute(this::flush0);
     }
 
     private void flush0() {
@@ -321,43 +315,33 @@ class LinkSession {
 
         switch (msg.type()) {
             case OPENSTREAM: {
-                openTcpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener() {
-
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (future.isSuccess()) {
-                            StreamContext context = StreamContext.getContext(future.channel());
-                            writeAndFlush(MessageType.OPENSTREAM.create().setId(context.getStreamId()));
-                            context.getChannel().closeFuture().addListener(closeFuture -> {
-                                if (getStreams().remove(context.getStreamId(), context))
-                                    writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
-                            });
-                        } else {
-                            writeAndFlush(MessageType.OPENSTREAM.create());
-                        }
+                openTcpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        StreamContext context = StreamContext.getContext(future.channel());
+                        writeAndFlush(MessageType.OPENSTREAM.create().setId(context.getStreamId()));
+                        context.getChannel().closeFuture().addListener(closeFuture -> {
+                            if (getStreams().remove(context.getStreamId(), context))
+                                writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
+                        });
+                    } else {
+                        writeAndFlush(MessageType.OPENSTREAM.create());
                     }
-
                 });
 
                 break;
             }
             case OPENSTREAMUDP: {
-                openUdpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener(new ChannelFutureListener() {
-
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (future.isSuccess()) {
-                            StreamContext context = StreamContext.getContext(future.channel());
-                            writeAndFlush(MessageType.OPENSTREAMUDP.create().setId(context.getStreamId()));
-                            context.getChannel().closeFuture().addListener(closeFuture -> {
-                                if (getStreams().remove(context.getStreamId(), context))
-                                    writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
-                            });
-                        } else {
-                            writeAndFlush(MessageType.OPENSTREAMUDP.create());
-                        }
+                openUdpStream(getTargetAddress(), LinkSession.this::newStreamContext).addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        StreamContext context = StreamContext.getContext(future.channel());
+                        writeAndFlush(MessageType.OPENSTREAMUDP.create().setId(context.getStreamId()));
+                        context.getChannel().closeFuture().addListener(closeFuture -> {
+                            if (getStreams().remove(context.getStreamId(), context))
+                                writeAndFlush(MessageType.CLOSESTREAM.create().setId(context.getStreamId()));
+                        });
+                    } else {
+                        writeAndFlush(MessageType.OPENSTREAMUDP.create());
                     }
-
                 });
 
                 break;
@@ -463,17 +447,12 @@ class LinkSession {
                 .option(ChannelOption.AUTO_READ, false)
                 .connect(remoteAddress)
                 .addListener(getManager().getResources().getChannelAccumulator())
-                .addListener(new ChannelFutureListener() {
-
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (future.isSuccess()) {
-                            Channel channel = future.channel();
-                            channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
-                            channel.config().setAutoRead(true);
-                        }
+                .addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        Channel channel = future.channel();
+                        channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
+                        channel.config().setAutoRead(true);
                     }
-
                 });
     }
 
@@ -501,17 +480,12 @@ class LinkSession {
                 .option(ChannelOption.AUTO_READ, false)
                 .connect(remoteAddress)
                 .addListener(getManager().getResources().getChannelAccumulator())
-                .addListener(new ChannelFutureListener() {
-
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (future.isSuccess()) {
-                            Channel channel = future.channel();
-                            channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
-                            channel.config().setAutoRead(true);
-                        }
+                .addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        Channel channel = future.channel();
+                        channel.attr(Vars.STREAMCONTEXT_KEY).set(contextBuilder.apply(channel));
+                        channel.config().setAutoRead(true);
                     }
-
                 });
     }
 
@@ -520,7 +494,7 @@ class LinkSession {
             if (getExecutor().inEventLoop())
                 tick0();
             else
-                getExecutor().execute(() -> tick0());
+                getExecutor().execute(this::tick0);
         }
     }
 
@@ -591,10 +565,7 @@ class LinkSession {
                 return false;
 
             switch (msg.type()) {
-                case OPENSTREAM: {
-                    getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
-                    return true;
-                }
+                case OPENSTREAM:
                 case OPENSTREAMUDP: {
                     getPendingMessages().addFirst(ReferenceCountUtil.retain(msg));
                     return true;

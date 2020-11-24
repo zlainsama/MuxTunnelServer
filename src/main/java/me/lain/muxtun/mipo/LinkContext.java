@@ -92,7 +92,7 @@ class LinkContext {
             if (getExecutor().inEventLoop())
                 tick0();
             else
-                getExecutor().execute(() -> tick0());
+                getExecutor().execute(this::tick0);
         }
     }
 

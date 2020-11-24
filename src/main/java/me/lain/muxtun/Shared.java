@@ -18,8 +18,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -134,27 +132,6 @@ public final class Shared {
 
         public static Collection<Future<?>> shutdownGracefully() {
             return Stream.concat(getEventLoopGroups().values().stream().map(EventLoopGroup::shutdownGracefully), getEventExecutorGroups().values().stream().map(EventExecutorGroup::shutdownGracefully)).collect(Collectors.toList());
-        }
-
-    }
-
-    public static final class RoundRobinSupplier<T> implements Supplier<T> {
-
-        private final List<Supplier<T>> suppliers;
-        private final AtomicInteger index;
-
-        private RoundRobinSupplier(Collection<Supplier<T>> suppliers) {
-            this.suppliers = Collections.unmodifiableList(new ArrayList<>(suppliers));
-            this.index = new AtomicInteger();
-        }
-
-        public static <T> RoundRobinSupplier<T> of(Collection<Supplier<T>> suppliers) {
-            return new RoundRobinSupplier<>(suppliers);
-        }
-
-        @Override
-        public T get() {
-            return suppliers.get(Math.abs(index.getAndIncrement() % suppliers.size())).get();
         }
 
     }

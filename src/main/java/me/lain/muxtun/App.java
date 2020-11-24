@@ -131,20 +131,15 @@ public class App {
         protocols = null;
         sslCtx = null;
 
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-
-            @Override
-            public void run() {
-                SimpleLogger.println("%s > Shutting down...", Shared.printNow());
-                List<Future<?>> futures = new ArrayList<>();
-                futures.addAll(Shared.NettyObjects.shutdownGracefully());
-                futures.add(theServer.stop());
-                Shared.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
-                SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
-                Shared.sleep(100L);
-            }
-
-        });
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            SimpleLogger.println("%s > Shutting down...", Shared.printNow());
+            List<Future<?>> futures = new ArrayList<>();
+            futures.addAll(Shared.NettyObjects.shutdownGracefully());
+            futures.add(theServer.stop());
+            Shared.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
+            SimpleLogger.println("%s > [%s] is now offline.", Shared.printNow(), theServer.toString());
+            Shared.sleep(100L);
+        }));
     }
 
     private static boolean nonCommentLine(String line) {
