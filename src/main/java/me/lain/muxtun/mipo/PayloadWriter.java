@@ -44,7 +44,13 @@ interface PayloadWriter {
     boolean write(ByteBuf payload) throws Exception;
 
     default boolean writeSlices(ByteBuf payload) throws Exception {
-        return writeSlices(payload, 16384, null);
+        int length = payload.readableBytes();
+        if (length >= 65536)
+            return writeSlices(payload, 32768, null);
+        else if (length >= 16384)
+            return writeSlices(payload, 16384, null);
+        else
+            return writeSlices(payload, 8192, null);
     }
 
     default boolean writeSlices(ByteBuf payload, int size, List<ByteBuf> list) throws Exception {
