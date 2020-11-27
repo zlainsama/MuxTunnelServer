@@ -122,8 +122,6 @@ class LinkSession {
         while (!pendingMessages.isEmpty()) {
             pendingMessages.removeAll(pendingMessages.stream().peek(ReferenceCountUtil::release).collect(Collectors.toList()));
         }
-
-        System.gc();
     }
 
     boolean drop(Channel channel) {
