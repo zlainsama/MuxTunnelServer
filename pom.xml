@@ -4,7 +4,7 @@
 
     <groupId>me.lain</groupId>
     <artifactId>MuxTunnelServer</artifactId>
-    <version>0.2.41</version>
+    <version>0.2.42</version>
     <packaging>jar</packaging>
 
     <name>MuxTunnelServer</name>
@@ -20,7 +20,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>4.1.54.Final</version>
+            <version>4.1.55.Final</version>
         </dependency>
     </dependencies>
 

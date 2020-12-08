@@ -10,8 +10,8 @@ import java.util.function.IntUnaryOperator;
 
 class StreamContext {
 
-    private static final int INITIAL_QUOTA = 2097152;
-    private static final int QUOTA_THRESHOLD = 524288;
+    private static final int INITIAL_QUOTA = 8388608;
+    private static final int QUOTA_THRESHOLD = 1048576;
 
     private final UUID streamId;
     private final LinkSession session;
