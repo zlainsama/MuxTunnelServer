@@ -16,7 +16,8 @@ import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.Message;
 import me.lain.muxtun.codec.Message.MessageType;
 import me.lain.muxtun.util.FlowControl;
-import me.lain.muxtun.util.SimpleLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.SocketAddress;
 import java.util.*;
@@ -31,6 +32,8 @@ import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
 class LinkSession {
+
+    private static final Logger logger = LoggerFactory.getLogger(LinkSession.class);
 
     private final UUID sessionId;
     private final LinkManager manager;
@@ -197,7 +200,7 @@ class LinkSession {
 
                         long lastRTO = 250L;
 
-                        boolean duplicate(Message msg, Consumer<Message> action, Consumer<Throwable> logger) {
+                        boolean duplicate(Message msg, Consumer<Message> action) {
                             try {
                                 action.accept(msg.copy());
 
@@ -205,9 +208,9 @@ class LinkSession {
                             } catch (IllegalReferenceCountException ignored) {
                                 return false;
                             } catch (Throwable e) {
-                                logger.accept(e);
+                                logger.error("error duplicating message", e);
 
-                                return true;
+                                return false;
                             }
                         }
 
@@ -225,7 +228,7 @@ class LinkSession {
                                 if (link.isPresent()) {
                                     LinkContext context = LinkContext.getContext(link.get());
 
-                                    if (duplicate(msg, context::writeAndFlush, SimpleLogger::printStackTrace)) {
+                                    if (duplicate(msg, context::writeAndFlush)) {
                                         getExecutor().schedule(this, lastRTO = context.getSRTT().rto(), TimeUnit.MILLISECONDS);
                                     } else {
                                         getMembers().stream().map(LinkContext::getContext).map(LinkContext::getTasks).forEach(tasks -> tasks.remove(seq, this));

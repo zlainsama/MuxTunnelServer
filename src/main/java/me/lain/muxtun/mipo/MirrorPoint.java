@@ -6,13 +6,17 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import me.lain.muxtun.Shared;
 import me.lain.muxtun.codec.MessageCodec;
+import me.lain.muxtun.mipo.config.MirrorPointConfig;
 
+import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,12 +24,14 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MirrorPoint {
 
     private final MirrorPointConfig config;
+    private final SslContext sslCtx;
     private final ChannelGroup channels;
     private final LinkManager manager;
     private final AtomicReference<Future<?>> scheduledMaintainTask;
 
-    public MirrorPoint(MirrorPointConfig config) {
-        this.config = config;
+    public MirrorPoint(MirrorPointConfig config) throws IOException {
+        this.config = Objects.requireNonNull(config, "config");
+        this.sslCtx = MirrorPointConfig.buildContext(config.getPathCert(), config.getPathKey(), config.getTrusts(), config.getCiphers(), config.getProtocols());
         this.channels = new DefaultChannelGroup("MirrorPoint", GlobalEventExecutor.INSTANCE, true);
         this.manager = new LinkManager(new SharedResources(future -> {
             if (future.isSuccess())
@@ -53,7 +59,7 @@ public class MirrorPoint {
 
                         ch.pipeline().addLast(new ReadTimeoutHandler(600));
                         ch.pipeline().addLast(new WriteTimeoutHandler(60));
-                        ch.pipeline().addLast(Vars.HANDLERNAME_TLS, config.getSslCtx().newHandler(ch.alloc(), Vars.SHARED_POOL));
+                        ch.pipeline().addLast(Vars.HANDLERNAME_TLS, sslCtx.newHandler(ch.alloc(), Vars.SHARED_POOL));
                         ch.pipeline().addLast(Vars.HANDLERNAME_CODEC, new MessageCodec());
                         ch.pipeline().addLast(Vars.HANDLERNAME_HANDLER, LinkHandler.DEFAULT);
                     }
@@ -79,11 +85,6 @@ public class MirrorPoint {
             manager.getSessions().values().forEach(LinkSession::close);
             Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false));
         });
-    }
-
-    @Override
-    public String toString() {
-        return config.getName();
     }
 
 }

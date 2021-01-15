@@ -14,8 +14,6 @@ import io.netty.util.concurrent.*;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -23,7 +21,6 @@ import java.util.stream.Stream;
 
 public final class Shared {
 
-    public static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     public static final OutputStream voidStream = new OutputStream() {
 
         @Override
@@ -63,10 +60,6 @@ public final class Shared {
             combiner.finish(promise);
         });
         return promise;
-    }
-
-    public static String printNow() {
-        return dateFormat.format(LocalDateTime.now());
     }
 
     public static void sleep(long millis) {
