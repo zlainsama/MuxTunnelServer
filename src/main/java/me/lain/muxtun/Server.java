@@ -7,14 +7,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
-import java.io.PrintStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -25,37 +23,8 @@ public class Server {
     private static MirrorPointConfig theConfig = null;
     private static MirrorPoint theServer = null;
 
-    private static void discardOut() {
-        System.setOut(new PrintStream(Shared.voidStream));
-        System.setErr(new PrintStream(Shared.voidStream));
-    }
-
-    private static Path init(String... args) throws Exception {
-        int index = 0;
-        boolean discardOut = false;
-        Optional<Path> pathConfig = Optional.empty();
-
-        for (String arg : args) {
-            if (arg.startsWith("-")) {
-                if ("--discardOut".equalsIgnoreCase(arg))
-                    discardOut = true;
-            } else {
-                switch (index++) {
-                    case 0:
-                        pathConfig = Optional.of(Paths.get(arg));
-                        break;
-                }
-            }
-        }
-
-        if (discardOut)
-            discardOut();
-
-        return pathConfig.orElse(Paths.get("MuxTunnel.json"));
-    }
-
-    public static void main(String[] args) throws Exception {
-        try (BufferedReader in = Files.newBufferedReader(init(args), StandardCharsets.UTF_8)) {
+    public static void run(Path pathConfig) throws IOException {
+        try (BufferedReader in = Files.newBufferedReader(pathConfig, StandardCharsets.UTF_8)) {
             theConfig = MirrorPointConfig.fromJson(in.lines()
                     .filter(line -> !line.trim().startsWith("#"))
                     .collect(Collectors.joining(System.lineSeparator())));

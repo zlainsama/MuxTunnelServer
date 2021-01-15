@@ -12,8 +12,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.*;
 
 import javax.net.ssl.SSLContext;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -21,29 +19,6 @@ import java.util.stream.Stream;
 
 public final class Shared {
 
-    public static final OutputStream voidStream = new OutputStream() {
-
-        @Override
-        public void close() throws IOException {
-        }
-
-        @Override
-        public void flush() throws IOException {
-        }
-
-        @Override
-        public void write(byte[] b) throws IOException {
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-        }
-
-    };
 
     private Shared() {
     }
