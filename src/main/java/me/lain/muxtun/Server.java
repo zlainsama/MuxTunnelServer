@@ -33,7 +33,7 @@ public class Server {
         logger.info("Starting...");
         theServer = new MirrorPoint(theConfig);
         if (theServer.start().awaitUninterruptibly(60L, TimeUnit.SECONDS))
-            logger.info("Done, theServer is up.");
+            logger.info("Done, theServer is up");
         else
             System.exit(1);
 
@@ -44,7 +44,7 @@ public class Server {
             List<Future<?>> futures = new ArrayList<>();
             futures.addAll(Shared.NettyObjects.shutdownGracefully());
             futures.add(theServer.stop());
-            Shared.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
+            Shared.NettyUtils.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
         }));
     }
 

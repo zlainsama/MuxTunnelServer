@@ -19,30 +19,22 @@ import java.util.stream.Stream;
 
 public final class Shared {
 
+    public static final class NettyUtils {
 
-    private Shared() {
-    }
-
-    public static Future<Void> combineFutures(Iterable<Future<?>> futures) {
-        return combineFutures(GlobalEventExecutor.INSTANCE, futures);
-    }
-
-    public static Future<Void> combineFutures(EventExecutor executor, Iterable<Future<?>> futures) {
-        Promise<Void> promise = executor.newPromise();
-        executor.execute(() -> {
-            PromiseCombiner combiner = new PromiseCombiner(executor);
-            futures.forEach(combiner::add);
-            combiner.finish(promise);
-        });
-        return promise;
-    }
-
-    public static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        public static Future<Void> combineFutures(Iterable<Future<?>> futures) {
+            return combineFutures(GlobalEventExecutor.INSTANCE, futures);
         }
+
+        public static Future<Void> combineFutures(EventExecutor executor, Iterable<Future<?>> futures) {
+            Promise<Void> promise = executor.newPromise();
+            executor.execute(() -> {
+                PromiseCombiner combiner = new PromiseCombiner(executor);
+                futures.forEach(combiner::add);
+                combiner.finish(promise);
+            });
+            return promise;
+        }
+
     }
 
     public static final class NettyObjects {
@@ -54,9 +46,6 @@ public final class Shared {
         private static final Map<String, EventLoopGroup> eventLoopGroupsView = Collections.unmodifiableMap(eventLoopGroups);
         private static final Map<String, EventExecutorGroup> eventExecutorGroups = new ConcurrentHashMap<>();
         private static final Map<String, EventExecutorGroup> eventExecutorGroupsView = Collections.unmodifiableMap(eventExecutorGroups);
-
-        private NettyObjects() {
-        }
 
         public static Map<String, EventExecutorGroup> getEventExecutorGroups() {
             return eventExecutorGroupsView;
@@ -121,9 +110,6 @@ public final class Shared {
                 defaultProtocols = Collections.unmodifiableList(protocols);
                 defaultCipherSuites = Collections.unmodifiableList(cipherSuites);
             }
-        }
-
-        private TLS() {
         }
 
     }

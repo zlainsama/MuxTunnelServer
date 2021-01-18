@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN" packages="me.lain.muxtun">
+<Configuration status="WARN">
     <Appenders>
         <Console name="SysOut" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{HH:mm:ss} %5p > %msg%n"/>
+            <PatternLayout pattern="%d{HH:mm:ss} %p > %msg%n"/>
         </Console>
         <RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
-            <PatternLayout pattern="%d{HH:mm:ss} %5p > %msg%n"/>
+            <PatternLayout pattern="%d{HH:mm:ss} %p > %msg%n"/>
             <Policies>
                 <TimeBasedTriggeringPolicy/>
                 <OnStartupTriggeringPolicy/>
