@@ -527,38 +527,37 @@ class LinkSession {
     }
 
     private void updateReceived0(IntConsumer acknowledger) {
-        acknowledger.accept(getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue), seq -> {
-            ReferenceCountUtil.release(handleMessage0(getInboundBuffer().remove(seq)));
-        }, seq -> {
-            ReferenceCountUtil.release(getInboundBuffer().remove(seq));
-        }, (seq, expect) -> {
-            Message msg = getInboundBuffer().get(seq);
+        acknowledger.accept(getFlowControl().updateReceived(getInboundBuffer().keySet().stream().mapToInt(Integer::intValue),
+                seq -> ReferenceCountUtil.release(handleMessage0(getInboundBuffer().remove(seq))),
+                seq -> ReferenceCountUtil.release(getInboundBuffer().remove(seq)),
+                (seq, expect) -> {
+                    Message msg = getInboundBuffer().get(seq);
 
-            if (msg != null && msg != Vars.PLACEHOLDER) {
-                switch (msg.type()) {
-                    case OPENSTREAM:
-                    case OPENSTREAMUDP: {
-                        if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
-                            ReferenceCountUtil.release(handleMessage0(msg));
+                    if (msg != null && msg != Vars.PLACEHOLDER) {
+                        switch (msg.type()) {
+                            case OPENSTREAM:
+                            case OPENSTREAMUDP: {
+                                if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
+                                    ReferenceCountUtil.release(handleMessage0(msg));
 
-                        break;
+                                break;
+                            }
+                            case CLOSESTREAM:
+                            case DATASTREAM: {
+                                if (expect - msg.getReq() > 0 || getInboundBuffer().get(msg.getReq()) == Vars.PLACEHOLDER)
+                                    if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
+                                        ReferenceCountUtil.release(handleMessage0(msg));
+
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
+                        }
                     }
-                    case CLOSESTREAM:
-                    case DATASTREAM: {
-                        if (expect - msg.getReq() > 0 || getInboundBuffer().get(msg.getReq()) == Vars.PLACEHOLDER)
-                            if (getInboundBuffer().replace(seq, msg, Vars.PLACEHOLDER))
-                                ReferenceCountUtil.release(handleMessage0(msg));
 
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-            }
-
-            return 0;
-        }));
+                    return 0;
+                }));
     }
 
     boolean write(Message msg) {

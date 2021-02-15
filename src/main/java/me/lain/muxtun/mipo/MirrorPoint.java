@@ -1,6 +1,7 @@
 package me.lain.muxtun.mipo;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.group.ChannelGroup;
@@ -20,8 +21,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 public class MirrorPoint {
+
+    private static final Consumer<Future<?>> CANCEL_FUTURE = future -> future.cancel(false);
 
     private final MirrorPointConfig config;
     private final SslContext sslCtx;
@@ -33,13 +37,13 @@ public class MirrorPoint {
         this.config = Objects.requireNonNull(config, "config");
         this.sslCtx = MirrorPointConfig.buildContext(config.getPathCert(), config.getPathKey(), config.getTrusts(), config.getCiphers(), config.getProtocols());
         this.channels = new DefaultChannelGroup("MirrorPoint", GlobalEventExecutor.INSTANCE, true);
-        this.manager = new LinkManager(new SharedResources(future -> {
-            if (future.isSuccess())
-                channels.add(future.channel());
-        }, requestId -> {
-            return Optional.ofNullable(config.getTargetAddresses().get(requestId));
-        }));
+        this.manager = new LinkManager(new SharedResources(this::addChannel, requestId -> Optional.ofNullable(config.getTargetAddresses().get(requestId))));
         this.scheduledMaintainTask = new AtomicReference<>();
+    }
+
+    private void addChannel(ChannelFuture future) {
+        if (future.isSuccess())
+            getChannels().add(future.channel());
     }
 
     public ChannelGroup getChannels() {
@@ -72,18 +76,18 @@ public class MirrorPoint {
                 .addListener(manager.getResources().getChannelAccumulator())
                 .addListener(future -> {
                     if (future.isSuccess())
-                        Optional.ofNullable(scheduledMaintainTask.getAndSet(GlobalEventExecutor.INSTANCE.scheduleWithFixedDelay(() -> {
-                            manager.getSessions().values().forEach(LinkSession::tick);
-                        }, 1L, 1L, TimeUnit.SECONDS))).ifPresent(scheduled -> scheduled.cancel(false));
+                        Optional.ofNullable(scheduledMaintainTask.getAndSet(GlobalEventExecutor.INSTANCE.scheduleWithFixedDelay(
+                                () -> manager.getSessions().values().forEach(LinkSession::tick),
+                                1L, 1L, TimeUnit.SECONDS))).ifPresent(CANCEL_FUTURE);
                     else
                         stop();
                 });
     }
 
     public Future<?> stop() {
-        return channels.close().addListener(future -> {
+        return getChannels().close().addListener(future -> {
             manager.getSessions().values().forEach(LinkSession::close);
-            Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(scheduled -> scheduled.cancel(false));
+            Optional.ofNullable(scheduledMaintainTask.getAndSet(null)).ifPresent(CANCEL_FUTURE);
         });
     }
 

@@ -20,10 +20,10 @@ public class Server {
 
     private static final Logger logger = LoggerFactory.getLogger(Server.class);
 
-    private static MirrorPointConfig theConfig = null;
     private static MirrorPoint theServer = null;
 
     public static void run(Path pathConfig) throws IOException {
+        MirrorPointConfig theConfig;
         try (BufferedReader in = Files.newBufferedReader(pathConfig, StandardCharsets.UTF_8)) {
             theConfig = MirrorPointConfig.fromJson(in.lines()
                     .filter(line -> !line.trim().startsWith("#"))
@@ -36,8 +36,6 @@ public class Server {
             logger.info("Done, theServer is up");
         else
             System.exit(1);
-
-        theConfig = null;
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutting down...");
