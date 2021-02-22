@@ -5,14 +5,14 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 @Sharable
 class UdpStreamHandler extends ChannelInboundHandlerAdapter {
 
     static final UdpStreamHandler DEFAULT = new UdpStreamHandler();
-    private static final Logger logger = LoggerFactory.getLogger(UdpStreamHandler.class);
+    private static final Logger LOGGER = LogManager.getLogger();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -31,7 +31,7 @@ class UdpStreamHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        ctx.close().addListener(future -> logger.error("closed udp stream connection due to error", cause));
+        ctx.close().addListener(future -> LOGGER.error("closed udp stream connection due to error", cause));
     }
 
     private void handleMessage(StreamContext sctx, DatagramPacket msg) throws Exception {

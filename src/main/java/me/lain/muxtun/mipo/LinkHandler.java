@@ -8,8 +8,8 @@ import io.netty.handler.traffic.ChannelTrafficShapingHandler;
 import io.netty.util.ReferenceCountUtil;
 import me.lain.muxtun.codec.Message;
 import me.lain.muxtun.codec.Message.MessageType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.net.SocketAddress;
 import java.util.Arrays;
@@ -20,7 +20,7 @@ import java.util.UUID;
 class LinkHandler extends ChannelDuplexHandler {
 
     static final LinkHandler DEFAULT = new LinkHandler();
-    private static final Logger logger = LoggerFactory.getLogger(LinkHandler.class);
+    private static final Logger LOGGER = LogManager.getLogger();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -39,7 +39,7 @@ class LinkHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        ctx.close().addListener(future -> logger.error("closed link connection due to error", cause));
+        ctx.close().addListener(future -> LOGGER.error("closed link connection due to error", cause));
     }
 
     private void handleMessage(LinkContext lctx, Message msg) throws Exception {

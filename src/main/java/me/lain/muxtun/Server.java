@@ -3,8 +3,8 @@ package me.lain.muxtun;
 import io.netty.util.concurrent.Future;
 import me.lain.muxtun.mipo.MirrorPoint;
 import me.lain.muxtun.mipo.config.MirrorPointConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 public class Server {
 
-    private static final Logger logger = LoggerFactory.getLogger(Server.class);
+    private static final Logger LOGGER = LogManager.getLogger();
 
     private static MirrorPoint theServer = null;
 
@@ -30,20 +30,31 @@ public class Server {
                     .collect(Collectors.joining(System.lineSeparator())));
         }
 
-        logger.info("Starting...");
+        LOGGER.info("Starting...");
         theServer = new MirrorPoint(theConfig);
         if (theServer.start().awaitUninterruptibly(60L, TimeUnit.SECONDS))
-            logger.info("Done, theServer is up");
-        else
+            LOGGER.info("Done, theServer is up");
+        else {
+            LOGGER.fatal("Took too long to start, terminating...");
+            shutdown(10L, TimeUnit.SECONDS);
+            LOGGER.info("Terminated.");
+            LogManager.shutdown();
             System.exit(1);
+        }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutting down...");
-            List<Future<?>> futures = new ArrayList<>();
-            futures.addAll(Shared.NettyObjects.shutdownGracefully());
-            futures.add(theServer.stop());
-            Shared.NettyUtils.combineFutures(futures).awaitUninterruptibly(60L, TimeUnit.SECONDS);
+            LOGGER.info("Shutting down...");
+            shutdown(60L, TimeUnit.SECONDS);
+            LOGGER.info("Done.");
+            LogManager.shutdown();
         }));
+    }
+
+    public static void shutdown(long timeout, TimeUnit unit) {
+        List<Future<?>> futures = new ArrayList<>();
+        futures.addAll(Shared.NettyObjects.shutdownGracefully());
+        futures.add(theServer.stop());
+        Shared.NettyUtils.combineFutures(futures).awaitUninterruptibly(timeout, unit);
     }
 
 }
