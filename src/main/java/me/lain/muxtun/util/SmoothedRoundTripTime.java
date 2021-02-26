@@ -31,11 +31,11 @@ public class SmoothedRoundTripTime {
         if (SRTT == 0L) {
             SRTT = RTT;
             RTTVAR = RTT / 2L;
-            RTO = SRTT + Math.max(1000L, Math.round(K * RTTVAR));
+            RTO = SRTT + Math.max(1L, Math.round(K * RTTVAR));
         } else {
             RTTVAR = Math.round(ONEMINUSBETA * RTTVAR) + Math.round(BETA * Math.abs(SRTT - RTT));
             SRTT = Math.round(ONEMINUSALPHA * SRTT) + Math.round(ALPHA * RTT);
-            RTO = SRTT + Math.max(1000L, Math.round(K * RTTVAR));
+            RTO = SRTT + Math.max(1L, Math.round(K * RTTVAR));
         }
 
         return get();

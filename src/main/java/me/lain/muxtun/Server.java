@@ -22,6 +22,18 @@ public class Server {
 
     private static MirrorPoint theServer = null;
 
+    static {
+        ShutdownTasks.register(() -> {
+            if (theServer != null) {
+                LOGGER.info("Shutting down...");
+                shutdown(60L, TimeUnit.SECONDS);
+                LOGGER.info("Done.");
+            }
+
+            LogManager.shutdown();
+        });
+    }
+
     public static void run(Path pathConfig) throws IOException {
         MirrorPointConfig theConfig;
         try (BufferedReader in = Files.newBufferedReader(pathConfig, StandardCharsets.UTF_8)) {
@@ -32,22 +44,22 @@ public class Server {
 
         LOGGER.info("Starting...");
         theServer = new MirrorPoint(theConfig);
-        if (theServer.start().awaitUninterruptibly(60L, TimeUnit.SECONDS))
-            LOGGER.info("Done, theServer is up");
-        else {
+        Future<?> result;
+        if ((result = theServer.start()).awaitUninterruptibly(60L, TimeUnit.SECONDS)) {
+            if (result.isSuccess())
+                LOGGER.info("Done, theServer is up.");
+            else {
+                LOGGER.fatal("error starting theServer", result.cause());
+                LogManager.shutdown();
+                System.exit(1);
+            }
+        } else {
             LOGGER.fatal("Took too long to start, terminating...");
             shutdown(10L, TimeUnit.SECONDS);
             LOGGER.info("Terminated.");
             LogManager.shutdown();
             System.exit(1);
         }
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            LOGGER.info("Shutting down...");
-            shutdown(60L, TimeUnit.SECONDS);
-            LOGGER.info("Done.");
-            LogManager.shutdown();
-        }));
     }
 
     public static void shutdown(long timeout, TimeUnit unit) {

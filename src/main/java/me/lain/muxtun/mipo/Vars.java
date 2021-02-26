@@ -24,8 +24,8 @@ class Vars {
     static final AttributeKey<LinkContext> LINKCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#LinkContext");
     static final AttributeKey<StreamContext> STREAMCONTEXT_KEY = AttributeKey.valueOf("me.lain.muxtun.mipo.Vars#StreamContext");
 
-    static final int GROUP_THREADS = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors() * 2, Short.MAX_VALUE));
-    static final EventLoopGroup BOSSES = Shared.NettyObjects.getOrCreateEventLoopGroup("bossesGroup", 1);
+    static final int GROUP_THREADS = Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, Short.MAX_VALUE));
+    static final EventLoopGroup BOSSES = Shared.NettyObjects.getOrCreateEventLoopGroup("bossesGroup", 2);
     static final EventLoopGroup WORKERS = Shared.NettyObjects.getOrCreateEventLoopGroup("workersGroup", GROUP_THREADS);
     static final EventExecutorGroup SESSIONS = Shared.NettyObjects.getOrCreateEventExecutorGroup("sessionsGroup", GROUP_THREADS);
     static final ExecutorService SHARED_POOL = Executors.newWorkStealingPool(GROUP_THREADS);
