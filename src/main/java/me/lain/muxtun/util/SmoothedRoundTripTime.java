@@ -42,7 +42,7 @@ public class SmoothedRoundTripTime {
     }
 
     public long var() {
-        return Math.max(0L, RTTVAR);
+        return Math.max(1L, RTTVAR);
     }
 
 }

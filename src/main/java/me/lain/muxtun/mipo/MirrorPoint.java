@@ -37,7 +37,7 @@ public class MirrorPoint {
         this.config = Objects.requireNonNull(config, "config");
         this.sslCtx = MirrorPointConfig.buildContext(config.getPathCert(), config.getPathKey(), config.getTrusts(), config.getCiphers(), config.getProtocols());
         this.channels = new DefaultChannelGroup("MirrorPoint", GlobalEventExecutor.INSTANCE, true);
-        this.manager = new LinkManager(new SharedResources(this::addChannel, requestId -> Optional.ofNullable(config.getTargetAddresses().get(requestId))));
+        this.manager = new LinkManager(new SharedResources(this::addChannel, config.getTargetAddresses()::get));
         this.scheduledMaintainTask = new AtomicReference<>();
     }
 

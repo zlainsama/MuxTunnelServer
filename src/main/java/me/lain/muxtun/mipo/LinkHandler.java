@@ -13,7 +13,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.net.SocketAddress;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.UUID;
 
 @Sharable
@@ -65,11 +64,11 @@ class LinkHandler extends ChannelDuplexHandler {
                                         lctx.setSession(value);
                                     }
                                 } else {
-                                    Optional<SocketAddress> address = lctx.getManager().getResources().getTargetTableLookup().apply(id2);
-                                    if (address.isPresent()) {
+                                    SocketAddress address = lctx.getManager().getResources().getTargetTableLookup().apply(id2);
+                                    if (address != null) {
                                         created[0] = true;
 
-                                        if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone(), address.get())).join(lctx.getChannel())) {
+                                        if ((value = new LinkSession(key, lctx.getManager(), Vars.SESSIONS.next(), challenge.clone(), address)).join(lctx.getChannel())) {
                                             lctx.setSession(value);
                                         }
                                     }
