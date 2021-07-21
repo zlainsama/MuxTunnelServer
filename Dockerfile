@@ -1,4 +1,4 @@
-FROM maven:3.6.3-amazoncorretto-8
+FROM maven:3-amazoncorretto-8
 COPY ./pom.xml ./pom.xml
 COPY ./src ./src
 RUN mvn package
