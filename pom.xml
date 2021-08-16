@@ -4,7 +4,7 @@
 
     <groupId>me.lain</groupId>
     <artifactId>MuxTunnelServer</artifactId>
-    <version>0.3.14</version>
+    <version>0.3.15</version>
     <packaging>jar</packaging>
 
     <name>MuxTunnelServer</name>
@@ -20,7 +20,12 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>4.1.66.Final</version>
+            <version>4.1.67.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>2.0.40.Final</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
