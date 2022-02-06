@@ -24,7 +24,7 @@ public class SmoothedRoundTripTime {
     }
 
     public long rto() {
-        return Math.max(1000L, RTO);
+        return Math.max(1000L, RTO + 125L);
     }
 
     public synchronized long updateAndGet(long RTT) {
