@@ -3,7 +3,7 @@ COPY ./pom.xml ./pom.xml
 COPY ./src ./src
 RUN mvn package
 
-FROM amazoncorretto:17
+FROM amazoncorretto:21
 WORKDIR /data
 COPY --from=0 target/MuxTunnelServer-*.jar /opt/muxtun/MuxTunnelServer.jar
 COPY --from=0 target/lib/*.jar /opt/muxtun/lib/
