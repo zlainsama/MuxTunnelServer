@@ -4,7 +4,7 @@
 
     <groupId>me.lain</groupId>
     <artifactId>MuxTunnelServer</artifactId>
-    <version>0.3.64</version>
+    <version>0.3.65</version>
     <packaging>jar</packaging>
 
     <name>MuxTunnelServer</name>
@@ -21,7 +21,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.115.Final</version>
+                <version>4.2.3.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -41,17 +41,17 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.11.0</version>
+            <version>2.13.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
-            <version>2.24.2</version>
+            <version>2.25.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.24.2</version>
+            <version>2.25.1</version>
         </dependency>
     </dependencies>
 
